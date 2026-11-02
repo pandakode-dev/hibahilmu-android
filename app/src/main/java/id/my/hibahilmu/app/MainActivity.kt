@@ -737,26 +737,79 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
                         )
                     }
                 }
-                2 -> LayarRemoteBlynkIotNative(
-                    user = user,
-                    tokenAktif = tokenAktif,
-                    onUbahToken = { baru ->
-                        tokenAktif = baru
-                        SessionTokenStore.simpanTokenKustom(context, baru)
-                    },
-                    daftarProjectPreset = daftarProjectPreset,
-                    projectPilih = projectPilih,
-                    onPilihProject = { prj ->
-                        projectPilih = prj
-                        val tBaru = SessionTokenStore.buatTokenBlynkUnik(user, prj.first)
-                        tokenAktif = tBaru
-                        SessionTokenStore.simpanTokenKustom(context, tBaru)
+                2 -> {
+                    var subModeTabIot by remember { mutableStateOf(0) } // 0: Simulator Sensor & Bahasa, 1: Remote Blynk
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F172A))
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { subModeTabIot = 0 },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (subModeTabIot == 0) Color(0xFF10B981) else Color(0xFF1E293B)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    "🔬 Lab Sensor, MATLAB & C++",
+                                    color = if (subModeTabIot == 0) Color(0xFF022C22) else Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                            Button(
+                                onClick = { subModeTabIot = 1 },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (subModeTabIot == 1) Color(0xFF10B981) else Color(0xFF1E293B)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    "📱 Remote Blynk Cloud",
+                                    color = if (subModeTabIot == 1) Color(0xFF022C22) else Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+
+                        if (subModeTabIot == 0) {
+                            LayarSimulatorMultiLabAndroid(
+                                user = user,
+                                tokenAktif = tokenAktif,
+                                onTambahXp = { xpPengguna += it }
+                            )
+                        } else {
+                            LayarRemoteBlynkIotNative(
+                                user = user,
+                                tokenAktif = tokenAktif,
+                                onUbahToken = { baru ->
+                                    tokenAktif = baru
+                                    SessionTokenStore.simpanTokenKustom(context, baru)
+                                },
+                                daftarProjectPreset = daftarProjectPreset,
+                                projectPilih = projectPilih,
+                                onPilihProject = { prj ->
+                                    projectPilih = prj
+                                    val tBaru = SessionTokenStore.buatTokenBlynkUnik(user, prj.first)
+                                    tokenAktif = tBaru
+                                    SessionTokenStore.simpanTokenKustom(context, tBaru)
+                                }
+                            )
+                        }
                     }
-                )
-                3 -> MenuTryoutCbtNative(
-                    daftarTryout = daftarTryout,
-                    onTambahXp = { xpPengguna += it }
-                )
+                }
+                3 -> {
+                    LayarSimulatorWokwiDanSensorLengkap(
+                        user = user,
+                        tokenAktif = tokenAktif,
+                        onTambahXp = { xpPengguna += it }
+                    )
+                }
                 4 -> MenuForumDanWebinarNative(
                     user = user,
                     daftarWebinar = daftarWebinar,
