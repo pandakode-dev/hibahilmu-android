@@ -30,6 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -106,8 +111,18 @@ fun SplashScreenNative() {
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text("HibahIlmu Native App", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
-            Text("100% NATIVE ANDROID • TERHUBUNG DATABASE SERVER", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "HibahIlmu Native App",
+                color = Color.White,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black
+            )
+            Text(
+                text = "100% NATIVE ANDROID • GOOGLE SSO & CLOUD DB",
+                color = Color(0xFF34D399),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.height(24.dp))
             CircularProgressIndicator(color = Color(0xFF10B981), strokeWidth = 3.dp)
         }
@@ -115,7 +130,7 @@ fun SplashScreenNative() {
 }
 
 // ============================================================================
-// GERBANG LOGIN & REGISTER WAJIB ONLINE KE SERVER HIBAHILMU.MY.ID
+// GERBANG LOGIN & REGISTER WAJIB ONLINE + GOOGLE SSO NATIVE ANDROID
 // ============================================================================
 @Composable
 fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) {
@@ -132,6 +147,66 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
 
     var sedangMemeriksaServer by remember { mutableStateOf(false) }
     var pesanErrorServer by remember { mutableStateOf<String?>(null) }
+
+    // Fungsi Memanggil Bottom Sheet Native Google Sign-In Android (Credential Manager)
+    fun jalankanLoginGoogleNativeAndroid() {
+        pesanErrorServer = null
+        sedangMemeriksaServer = true
+
+        scope.launch {
+            try {
+                val credentialManager = CredentialManager.create(context)
+
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(IotCloudApiService.GOOGLE_WEB_CLIENT_ID)
+                    .setAutoSelectEnabled(false)
+                    .build()
+
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                val result = credentialManager.getCredential(
+                    request = request,
+                    context = context
+                )
+
+                val credential = result.credential
+                if (credential is CustomCredential &&
+                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                ) {
+                    val googleIdTokenCred = GoogleIdTokenCredential.createFrom(credential.data)
+                    val idTokenResmi = googleIdTokenCred.idToken
+
+                    val resServer = IotCloudApiService.loginDenganGoogleSsoKeServer(
+                        idTokenGoogle = idTokenResmi,
+                        rolePilihan = pilihRole,
+                        instansi = inputInstansi.ifBlank { "Google Verified Android" }
+                    )
+
+                    sedangMemeriksaServer = false
+                    resServer.onSuccess { akunTerverifikasi ->
+                        Toast.makeText(
+                            context,
+                            "Login Google Berhasil: ${akunTerverifikasi.nama}!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        onLoginSuksesDariServer(akunTerverifikasi)
+                    }.onFailure { err ->
+                        pesanErrorServer = err.message
+                    }
+                } else {
+                    sedangMemeriksaServer = false
+                    pesanErrorServer = "Jenis kredensial Google tidak dikenali."
+                }
+            } catch (e: Exception) {
+                sedangMemeriksaServer = false
+                pesanErrorServer =
+                    "Kendala Google Sign-In: Pastikan akun Google sudah login di HP/Emulator dan SHA-1 Android sudah didaftarkan di Google Cloud Console. (${e.localizedMessage})"
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -159,10 +234,15 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.CloudDone, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(14.dp))
+                    Icon(
+                        Icons.Default.CloudDone,
+                        contentDescription = null,
+                        tint = Color(0xFF34D399),
+                        modifier = Modifier.size(14.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "ONLINE SERVER AUTH • HIBAHILMU.MY.ID",
+                        text = "WAJIB LOGIN SERVER • GOOGLE SSO AKTIF",
                         color = Color(0xFF34D399),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black
@@ -171,13 +251,13 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
             }
 
             Text(
-                text = if (modeRegister) "Registrasi ke Server" else "Login ke Server HibahIlmu",
+                text = if (modeRegister) "Registrasi ke Server" else "Masuk ke HibahIlmu",
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Black
             )
             Text(
-                text = "Membutuhkan koneksi internet aktif untuk memverifikasi akun di database hibahilmu.my.id",
+                text = "Pilih peran Anda lalu masuk dengan 1-Klik Google SSO atau akun Email.",
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp
             )
@@ -223,7 +303,50 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // TOMBOL UTAMA: LOGIN / REGISTER 1-KLIK VIA GOOGLE SSO NATIVE
+            Button(
+                enabled = !sedangMemeriksaServer,
+                onClick = { jalankanLoginGoogleNativeAndroid() },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Google",
+                    tint = Color(0xFFEA4335),
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Lanjutkan dengan Google (${pilihRole.uppercase()})",
+                    color = Color(0xFF0F172A),
+                    fontWeight = FontWeight.Black,
+                    fontSize = 13.sp
+                )
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF1E293B))
+                Text(
+                    text = "  ATAU EMAIL SERVER  ",
+                    color = Color(0xFF64748B),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF1E293B))
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (modeRegister) {
                 OutlinedTextField(
@@ -279,7 +402,7 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 enabled = !sedangMemeriksaServer,
@@ -313,34 +436,34 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(50.dp)
             ) {
                 if (sedangMemeriksaServer) {
                     CircularProgressIndicator(
                         color = Color(0xFF022C22),
                         strokeWidth = 2.5.dp,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Menghubungi hibahilmu.my.id...", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
+                    Text("Memverifikasi...", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
                 } else {
                     Text(
-                        text = if (modeRegister) "Daftarkan ke Database Server" else "Verifikasi & Login ke Server",
+                        text = if (modeRegister) "Daftarkan Email ke Server" else "Login dengan Email Server",
                         color = Color(0xFF022C22),
                         fontWeight = FontWeight.Black,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             TextButton(onClick = {
                 modeRegister = !modeRegister
                 pesanErrorServer = null
             }) {
                 Text(
-                    text = if (modeRegister) "Sudah punya akun di server? Klik untuk Login" else "Belum terdaftar di server? Daftar Akun Baru",
+                    text = if (modeRegister) "Sudah punya akun? Klik untuk Login" else "Ingin daftar manual pakai Email? Klik di sini",
                     color = Color(0xFF38BDF8),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold

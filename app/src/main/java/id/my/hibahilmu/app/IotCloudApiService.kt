@@ -18,17 +18,24 @@ data class ServerContentBundle(
 )
 
 object IotCloudApiService {
-    // Menggunakan domain utama tanpa www sesuai tangkapan layar browser Anda (plus fallback www)
+    // Domain utama hibahilmu.my.id beserta fallback www
     const val BASE_WEB_URL = "https://hibahilmu.my.id"
     private val DAFTAR_BASE_URL = listOf(
         "https://hibahilmu.my.id",
         "https://www.hibahilmu.my.id"
     )
 
+    // WEB CLIENT ID RESMI DARI GOOGLE CLOUD CONSOLE ANDA
+    const val GOOGLE_WEB_CLIENT_ID =
+        "1043466129331-1b2t0m91ku0i6l02b0ve6o45dbg5coof.apps.googleusercontent.com"
+
     const val IOT_CLOUD_ENDPOINT = "$BASE_WEB_URL/api/iot/cloud"
 
     // Helper HTTP POST yang tahan terhadap Redirect 301/302/307/308 Vercel
-    private fun eksekusiPostJsonAntiRedirect(pathEndpoint: String, payload: JSONObject): Pair<Int, String> {
+    private fun eksekusiPostJsonAntiRedirect(
+        pathEndpoint: String,
+        payload: JSONObject
+    ): Pair<Int, String> {
         var errorTerakhir = "Gagal menghubungi server"
         for (base in DAFTAR_BASE_URL) {
             try {
@@ -37,7 +44,7 @@ object IotCloudApiService {
 
                 while (batasRedirect > 0) {
                     val conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                        instanceFollowRedirects = false // Kita tangani manual agar POST tidak berubah jadi GET
+                        instanceFollowRedirects = false
                         requestMethod = "POST"
                         doInput = true
                         doOutput = true
@@ -45,7 +52,7 @@ object IotCloudApiService {
                         readTimeout = 10000
                         setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                         setRequestProperty("Accept", "application/json")
-                        setRequestProperty("User-Agent", "HibahIlmu-Android-Native/2.0")
+                        setRequestProperty("User-Agent", "HibahIlmu-Android-Native/2.1")
                     }
 
                     OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { writer ->
@@ -87,11 +94,13 @@ object IotCloudApiService {
                     connectTimeout = 10000
                     readTimeout = 10000
                     setRequestProperty("Accept", "application/json")
-                    setRequestProperty("User-Agent", "HibahIlmu-Android-Native/2.0")
+                    setRequestProperty("User-Agent", "HibahIlmu-Android-Native/2.1")
                 }
                 val code = conn.responseCode
                 if (code in 200..299) {
-                    return BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { it.readText() }
+                    return BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use {
+                        it.readText()
+                    }
                 } else {
                     errorTerakhir = "HTTP $code pada $base$pathEndpoint"
                 }
@@ -103,7 +112,7 @@ object IotCloudApiService {
     }
 
     // ========================================================================
-    // 1. LOGIN & REGISTER WAJIB ONLINE KE SERVER HIBAHILMU.MY.ID
+    // 1A. LOGIN & REGISTER REGULER (EMAIL & PASSWORD) KE SERVER HIBAHILMU.MY.ID
     // ========================================================================
     suspend fun autentikasiKeServer(
         action: String, // "login" atau "register"
@@ -147,9 +156,52 @@ object IotCloudApiService {
             )
         } catch (e: Exception) {
             Result.failure(
-                Exception(
-                    "Kendala koneksi ke hibahilmu.my.id: ${e.localizedMessage}. Pastikan izin INTERNET di AndroidManifest.xml sudah terpasang!"
+                Exception("Kendala koneksi ke hibahilmu.my.id: ${e.localizedMessage}")
+            )
+        }
+    }
+
+    // ========================================================================
+    // 1B. LOGIN / REGISTER VIA GOOGLE SSO NATIVE ANDROID KE SERVER HIBAHILMU
+    // ========================================================================
+    suspend fun loginDenganGoogleSsoKeServer(
+        idTokenGoogle: String,
+        rolePilihan: String = "siswa",
+        instansi: String = "Android Google SSO"
+    ): Result<UserAccount> = withContext(Dispatchers.IO) {
+        try {
+            val payload = JSONObject().apply {
+                put("action", "google_sso")
+                put("idToken", idTokenGoogle)
+                put("role", rolePilihan)
+                put("instansi", instansi)
+            }
+
+            val (code, bodyText) = eksekusiPostJsonAntiRedirect("/api/mobile/auth", payload)
+            val json = JSONObject(bodyText)
+
+            if (code !in 200..299 || !json.optBoolean("ok", false)) {
+                val msg = json.optString(
+                    "message",
+                    "Verifikasi Google SSO ditolak oleh server (HTTP $code)"
                 )
+                return@withContext Result.failure(Exception(msg))
+            }
+
+            val u = json.getJSONObject("user")
+            Result.success(
+                UserAccount(
+                    id = u.optString("id"),
+                    nama = u.optString("nama"),
+                    email = u.optString("email"),
+                    role = u.optString("role", rolePilihan),
+                    instansi = u.optString("instansi", "Google Verified Account"),
+                    xp = u.optInt("xp", 550)
+                )
+            )
+        } catch (e: Exception) {
+            Result.failure(
+                Exception("Gagal memverifikasi token Google ke server hibahilmu.my.id: ${e.localizedMessage}")
             )
         }
     }
@@ -157,175 +209,178 @@ object IotCloudApiService {
     // ========================================================================
     // 2. AMBIL DATA KELAS, MODUL, KUIS, TRYOUT CBT & FORUM DARI SERVER
     // ========================================================================
-    suspend fun ambilKontenUtamaDariServer(): Result<ServerContentBundle> = withContext(Dispatchers.IO) {
-        try {
-            val text = eksekusiGetJson("/api/mobile/content")
-            val root = JSONObject(text)
+    suspend fun ambilKontenUtamaDariServer(): Result<ServerContentBundle> =
+        withContext(Dispatchers.IO) {
+            try {
+                val text = eksekusiGetJson("/api/mobile/content")
+                val root = JSONObject(text)
 
-            val jenjangArr = root.optJSONArray("jenjangList")
-            val listJenjang = mutableListOf<JenjangNativeItem>()
-            if (jenjangArr != null) {
-                for (i in 0 until jenjangArr.length()) {
-                    val jObj = jenjangArr.getJSONObject(i)
-                    val kelasArr = jObj.optJSONArray("kelas")
-                    val listKelas = mutableListOf<KelasModulNative>()
+                val jenjangArr = root.optJSONArray("jenjangList")
+                val listJenjang = mutableListOf<JenjangNativeItem>()
+                if (jenjangArr != null) {
+                    for (i in 0 until jenjangArr.length()) {
+                        val jObj = jenjangArr.getJSONObject(i)
+                        val kelasArr = jObj.optJSONArray("kelas")
+                        val listKelas = mutableListOf<KelasModulNative>()
 
-                    if (kelasArr != null) {
-                        for (k in 0 until kelasArr.length()) {
-                            val kObj = kelasArr.getJSONObject(k)
+                        if (kelasArr != null) {
+                            for (k in 0 until kelasArr.length()) {
+                                val kObj = kelasArr.getJSONObject(k)
 
-                            val babArr = kObj.optJSONArray("daftarBab")
-                            val listBab = mutableListOf<BabMateriNative>()
-                            if (babArr != null) {
-                                for (b in 0 until babArr.length()) {
-                                    val bObj = babArr.getJSONObject(b)
-                                    listBab.add(
-                                        BabMateriNative(
-                                            id = bObj.optString("id"),
-                                            judulBab = bObj.optString("judulBab"),
-                                            durasiBab = bObj.optString("durasiBab"),
-                                            isiTeks = bObj.optString("isiTeks"),
-                                            rumus = bObj.optString("rumus")
+                                val babArr = kObj.optJSONArray("daftarBab")
+                                val listBab = mutableListOf<BabMateriNative>()
+                                if (babArr != null) {
+                                    for (b in 0 until babArr.length()) {
+                                        val bObj = babArr.getJSONObject(b)
+                                        listBab.add(
+                                            BabMateriNative(
+                                                id = bObj.optString("id"),
+                                                judulBab = bObj.optString("judulBab"),
+                                                durasiBab = bObj.optString("durasiBab"),
+                                                isiTeks = bObj.optString("isiTeks"),
+                                                rumus = bObj.optString("rumus")
+                                            )
                                         )
-                                    )
-                                }
-                            }
-
-                            val kuisArr = kObj.optJSONArray("daftarKuis")
-                            val listKuis = mutableListOf<KuisNativeItem>()
-                            if (kuisArr != null) {
-                                for (q in 0 until kuisArr.length()) {
-                                    val qObj = kuisArr.getJSONObject(q)
-                                    val opsiArr = qObj.optJSONArray("opsi")
-                                    val opsiList = mutableListOf<String>()
-                                    if (opsiArr != null) {
-                                        for (o in 0 until opsiArr.length()) {
-                                            opsiList.add(opsiArr.optString(o))
-                                        }
                                     }
-                                    listKuis.add(
-                                        KuisNativeItem(
-                                            id = qObj.optString("id"),
-                                            tanya = qObj.optString("tanya"),
-                                            opsi = opsiList,
-                                            jawabanBenar = qObj.optInt("jawabanBenar", 0),
-                                            pembahasan = qObj.optString("pembahasan")
-                                        )
-                                    )
                                 }
-                            }
 
-                            listKelas.add(
-                                KelasModulNative(
-                                    id = kObj.optString("id"),
-                                    judul = kObj.optString("judul"),
-                                    pembuatNama = kObj.optString("pembuatNama"),
-                                    level = kObj.optString("level"),
-                                    durasi = kObj.optString("durasi"),
-                                    syaratSkorMinimal = kObj.optInt("syaratSkorMinimal", 75),
-                                    rangkumanTeks = kObj.optString("rangkumanTeks"),
-                                    daftarBab = listBab,
-                                    daftarKuis = listKuis
+                                val kuisArr = kObj.optJSONArray("daftarKuis")
+                                val listKuis = mutableListOf<KuisNativeItem>()
+                                if (kuisArr != null) {
+                                    for (q in 0 until kuisArr.length()) {
+                                        val qObj = kuisArr.getJSONObject(q)
+                                        val opsiArr = qObj.optJSONArray("opsi")
+                                        val opsiList = mutableListOf<String>()
+                                        if (opsiArr != null) {
+                                            for (o in 0 until opsiArr.length()) {
+                                                opsiList.add(opsiArr.optString(o))
+                                            }
+                                        }
+                                        listKuis.add(
+                                            KuisNativeItem(
+                                                id = qObj.optString("id"),
+                                                tanya = qObj.optString("tanya"),
+                                                opsi = opsiList,
+                                                jawabanBenar = qObj.optInt("jawabanBenar", 0),
+                                                pembahasan = qObj.optString("pembahasan")
+                                            )
+                                        )
+                                    }
+                                }
+
+                                listKelas.add(
+                                    KelasModulNative(
+                                        id = kObj.optString("id"),
+                                        judul = kObj.optString("judul"),
+                                        pembuatNama = kObj.optString("pembuatNama"),
+                                        level = kObj.optString("level"),
+                                        durasi = kObj.optString("durasi"),
+                                        syaratSkorMinimal = kObj.optInt("syaratSkorMinimal", 75),
+                                        rangkumanTeks = kObj.optString("rangkumanTeks"),
+                                        daftarBab = listBab,
+                                        daftarKuis = listKuis
+                                    )
                                 )
-                            )
-                        }
-                    }
-
-                    listJenjang.add(
-                        JenjangNativeItem(
-                            id = jObj.optString("id"),
-                            nama = jObj.optString("nama"),
-                            tagline = jObj.optString("tagline"),
-                            deskripsi = jObj.optString("deskripsi"),
-                            kelas = listKelas
-                        )
-                    )
-                }
-            }
-
-            val tryoutArr = root.optJSONArray("tryoutList")
-            val listTryout = mutableListOf<PaketTryoutNative>()
-            if (tryoutArr != null) {
-                for (i in 0 until tryoutArr.length()) {
-                    val tObj = tryoutArr.getJSONObject(i)
-                    val soalArr = tObj.optJSONArray("daftarSoal")
-                    val listSoal = mutableListOf<KuisNativeItem>()
-                    if (soalArr != null) {
-                        for (s in 0 until soalArr.length()) {
-                            val sObj = soalArr.getJSONObject(s)
-                            val opArr = sObj.optJSONArray("opsi")
-                            val opList = mutableListOf<String>()
-                            if (opArr != null) {
-                                for (o in 0 until opArr.length()) opList.add(opArr.optString(o))
                             }
-                            listSoal.add(
-                                KuisNativeItem(
-                                    id = sObj.optString("id"),
-                                    tanya = sObj.optString("pertanyaan"),
-                                    opsi = opList,
-                                    jawabanBenar = sObj.optInt("jawabanBenar", 0),
-                                    pembahasan = sObj.optString("pembahasan")
-                                )
-                            )
                         }
+
+                        listJenjang.add(
+                            JenjangNativeItem(
+                                id = jObj.optString("id"),
+                                nama = jObj.optString("nama"),
+                                tagline = jObj.optString("tagline"),
+                                deskripsi = jObj.optString("deskripsi"),
+                                kelas = listKelas
+                            )
+                        )
                     }
-                    listTryout.add(
-                        PaketTryoutNative(
-                            id = tObj.optString("id"),
-                            judul = tObj.optString("judul"),
-                            kategoriTes = tObj.optString("kategoriTes"),
-                            jenjang = tObj.optString("jenjang"),
-                            durasiMenit = tObj.optInt("durasiMenit", 15),
-                            daftarSoal = listSoal
-                        )
-                    )
                 }
-            }
 
-            val webArr = root.optJSONArray("webinarList")
-            val listWebinar = mutableListOf<WebinarNativeItem>()
-            if (webArr != null) {
-                for (i in 0 until webArr.length()) {
-                    val wObj = webArr.getJSONObject(i)
-                    listWebinar.add(
-                        WebinarNativeItem(
-                            id = wObj.optString("id"),
-                            judulAcara = wObj.optString("judulAcara"),
-                            kategoriAcara = wObj.optString("kategoriAcara"),
-                            narasumber = wObj.optString("narasumber"),
-                            tanggalWaktu = wObj.optString("tanggalWaktu"),
-                            platform = wObj.optString("platform"),
-                            sedangLive = wObj.optBoolean("sedangLive", false)
+                val tryoutArr = root.optJSONArray("tryoutList")
+                val listTryout = mutableListOf<PaketTryoutNative>()
+                if (tryoutArr != null) {
+                    for (i in 0 until tryoutArr.length()) {
+                        val tObj = tryoutArr.getJSONObject(i)
+                        val soalArr = tObj.optJSONArray("daftarSoal")
+                        val listSoal = mutableListOf<KuisNativeItem>()
+                        if (soalArr != null) {
+                            for (s in 0 until soalArr.length()) {
+                                val sObj = soalArr.getJSONObject(s)
+                                val opArr = sObj.optJSONArray("opsi")
+                                val opList = mutableListOf<String>()
+                                if (opArr != null) {
+                                    for (o in 0 until opArr.length()) opList.add(opArr.optString(o))
+                                }
+                                listSoal.add(
+                                    KuisNativeItem(
+                                        id = sObj.optString("id"),
+                                        tanya = sObj.optString("pertanyaan"),
+                                        opsi = opList,
+                                        jawabanBenar = sObj.optInt("jawabanBenar", 0),
+                                        pembahasan = sObj.optString("pembahasan")
+                                    )
+                                )
+                            }
+                        }
+                        listTryout.add(
+                            PaketTryoutNative(
+                                id = tObj.optString("id"),
+                                judul = tObj.optString("judul"),
+                                kategoriTes = tObj.optString("kategoriTes"),
+                                jenjang = tObj.optString("jenjang"),
+                                durasiMenit = tObj.optInt("durasiMenit", 15),
+                                daftarSoal = listSoal
+                            )
                         )
-                    )
+                    }
                 }
-            }
 
-            val forumArr = root.optJSONArray("forumList")
-            val listForum = mutableListOf<DiskusiPrNativeItem>()
-            if (forumArr != null) {
-                for (i in 0 until forumArr.length()) {
-                    val fObj = forumArr.getJSONObject(i)
-                    listForum.add(
-                        DiskusiPrNativeItem(
-                            id = fObj.optString("id"),
-                            penanya = fObj.optString("penanya"),
-                            jenjang = fObj.optString("jenjang"),
-                            mapel = fObj.optString("mapel"),
-                            judul = fObj.optString("judul"),
-                            pertanyaan = fObj.optString("pertanyaan"),
-                            waktu = fObj.optString("waktu"),
-                            likes = fObj.optInt("likes", 1)
+                val webArr = root.optJSONArray("webinarList")
+                val listWebinar = mutableListOf<WebinarNativeItem>()
+                if (webArr != null) {
+                    for (i in 0 until webArr.length()) {
+                        val wObj = webArr.getJSONObject(i)
+                        listWebinar.add(
+                            WebinarNativeItem(
+                                id = wObj.optString("id"),
+                                judulAcara = wObj.optString("judulAcara"),
+                                kategoriAcara = wObj.optString("kategoriAcara"),
+                                narasumber = wObj.optString("narasumber"),
+                                tanggalWaktu = wObj.optString("tanggalWaktu"),
+                                platform = wObj.optString("platform"),
+                                sedangLive = wObj.optBoolean("sedangLive", false)
+                            )
                         )
-                    )
+                    }
                 }
-            }
 
-            Result.success(ServerContentBundle(listJenjang, listTryout, listWebinar, listForum))
-        } catch (e: Exception) {
-            Result.failure(e)
+                val forumArr = root.optJSONArray("forumList")
+                val listForum = mutableListOf<DiskusiPrNativeItem>()
+                if (forumArr != null) {
+                    for (i in 0 until forumArr.length()) {
+                        val fObj = forumArr.getJSONObject(i)
+                        listForum.add(
+                            DiskusiPrNativeItem(
+                                id = fObj.optString("id"),
+                                penanya = fObj.optString("penanya"),
+                                jenjang = fObj.optString("jenjang"),
+                                mapel = fObj.optString("mapel"),
+                                judul = fObj.optString("judul"),
+                                pertanyaan = fObj.optString("pertanyaan"),
+                                waktu = fObj.optString("waktu"),
+                                likes = fObj.optInt("likes", 1)
+                            )
+                        )
+                    }
+                }
+
+                Result.success(
+                    ServerContentBundle(listJenjang, listTryout, listWebinar, listForum)
+                )
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
-    }
 
     suspend fun kirimPertanyaanForumKeServer(
         penanya: String,
@@ -351,58 +406,59 @@ object IotCloudApiService {
     // ========================================================================
     // 3. SINKRONISASI REAL-TIME IOT CLOUD & BLYNK BROKER
     // ========================================================================
-    suspend fun ambilStatePinDariServer(token: String): Result<CloudIotState> = withContext(Dispatchers.IO) {
-        try {
-            val encodedToken = URLEncoder.encode(token.trim(), "UTF-8")
-            val responseText = eksekusiGetJson("/api/iot/cloud?token=$encodedToken")
-            val root = JSONObject(responseText)
-            val dataObj = root.optJSONObject("data") ?: JSONObject()
+    suspend fun ambilStatePinDariServer(token: String): Result<CloudIotState> =
+        withContext(Dispatchers.IO) {
+            try {
+                val encodedToken = URLEncoder.encode(token.trim(), "UTF-8")
+                val responseText = eksekusiGetJson("/api/iot/cloud?token=$encodedToken")
+                val root = JSONObject(responseText)
+                val dataObj = root.optJSONObject("data") ?: JSONObject()
 
-            val vPinsMap = mutableMapOf<String, Double>()
-            val vPinsJson = dataObj.optJSONObject("virtualPins")
-            if (vPinsJson != null) {
-                for (k in vPinsJson.keys()) {
-                    vPinsMap[k] = vPinsJson.optDouble(k, 0.0)
+                val vPinsMap = mutableMapOf<String, Double>()
+                val vPinsJson = dataObj.optJSONObject("virtualPins")
+                if (vPinsJson != null) {
+                    for (k in vPinsJson.keys()) {
+                        vPinsMap[k] = vPinsJson.optDouble(k, 0.0)
+                    }
                 }
-            }
 
-            val aktuatorMap = mutableMapOf<String, Boolean>()
-            val aktJson = dataObj.optJSONObject("statusAktuator")
-            if (aktJson != null) {
-                for (k in aktJson.keys()) {
-                    aktuatorMap[k] = aktJson.optBoolean(k, false)
+                val aktuatorMap = mutableMapOf<String, Boolean>()
+                val aktJson = dataObj.optJSONObject("statusAktuator")
+                if (aktJson != null) {
+                    for (k in aktJson.keys()) {
+                        aktuatorMap[k] = aktJson.optBoolean(k, false)
+                    }
                 }
-            }
 
-            val logs = mutableListOf<LogPesanIot>()
-            val logArr = dataObj.optJSONArray("logPesan")
-            if (logArr != null) {
-                for (i in 0 until logArr.length()) {
-                    val item = logArr.getJSONObject(i)
-                    logs.add(
-                        LogPesanIot(
-                            waktu = item.optString("waktu", "-"),
-                            sumber = item.optString("sumber", "ANDROID_NATIVE"),
-                            topik = item.optString("topik", "-"),
-                            payload = item.optString("payload", "{}")
+                val logs = mutableListOf<LogPesanIot>()
+                val logArr = dataObj.optJSONArray("logPesan")
+                if (logArr != null) {
+                    for (i in 0 until logArr.length()) {
+                        val item = logArr.getJSONObject(i)
+                        logs.add(
+                            LogPesanIot(
+                                waktu = item.optString("waktu", "-"),
+                                sumber = item.optString("sumber", "ANDROID_NATIVE"),
+                                topik = item.optString("topik", "-"),
+                                payload = item.optString("payload", "{}")
+                            )
                         )
-                    )
+                    }
                 }
-            }
 
-            Result.success(
-                CloudIotState(
-                    token = dataObj.optString("token", token),
-                    virtualPins = vPinsMap,
-                    statusAktuator = aktuatorMap,
-                    logPesan = logs,
-                    terakhirUpdate = dataObj.optString("terakhirUpdate", "Baru saja")
+                Result.success(
+                    CloudIotState(
+                        token = dataObj.optString("token", token),
+                        virtualPins = vPinsMap,
+                        statusAktuator = aktuatorMap,
+                        logPesan = logs,
+                        terakhirUpdate = dataObj.optString("terakhirUpdate", "Baru saja")
+                    )
                 )
-            )
-        } catch (e: Exception) {
-            Result.failure(e)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
-    }
 
     suspend fun kirimPerubahanPinKeServer(
         token: String,
