@@ -55,7 +55,10 @@ dependencies {
 
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Library Google SSO Credential Manager + Play Services Auth (Fallback Anti-Gagal)
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

@@ -14,11 +14,12 @@ data class ServerContentBundle(
     val jenjangList: List<JenjangNativeItem>,
     val tryoutList: List<PaketTryoutNative>,
     val webinarList: List<WebinarNativeItem>,
-    val forumList: List<DiskusiPrNativeItem>
+    val forumList: List<DiskusiPrNativeItem>,
+    val beasiswaList: List<PengajuanBeasiswaNative>,
+    val daftarAkunServer: List<UserAccount>
 )
 
 object IotCloudApiService {
-    // Domain utama hibahilmu.my.id beserta fallback www
     const val BASE_WEB_URL = "https://hibahilmu.my.id"
     private val DAFTAR_BASE_URL = listOf(
         "https://hibahilmu.my.id",
@@ -31,7 +32,6 @@ object IotCloudApiService {
 
     const val IOT_CLOUD_ENDPOINT = "$BASE_WEB_URL/api/iot/cloud"
 
-    // Helper HTTP POST yang tahan terhadap Redirect 301/302/307/308 Vercel
     private fun eksekusiPostJsonAntiRedirect(
         pathEndpoint: String,
         payload: JSONObject
@@ -52,7 +52,7 @@ object IotCloudApiService {
                         readTimeout = 10000
                         setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                         setRequestProperty("Accept", "application/json")
-                        setRequestProperty("User-Agent", "HibahIlmu-Android-Native/2.1")
+                        setRequestProperty("User-Agent", "HibahIlmu-Android-Native/3.0")
                     }
 
                     OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { writer ->
@@ -83,7 +83,6 @@ object IotCloudApiService {
         throw Exception(errorTerakhir)
     }
 
-    // Helper HTTP GET yang otomatis mengikuti domain aktif
     private fun eksekusiGetJson(pathEndpoint: String): String {
         var errorTerakhir = "Gagal mengambil data"
         for (base in DAFTAR_BASE_URL) {
@@ -94,7 +93,7 @@ object IotCloudApiService {
                     connectTimeout = 10000
                     readTimeout = 10000
                     setRequestProperty("Accept", "application/json")
-                    setRequestProperty("User-Agent", "HibahIlmu-Android-Native/2.1")
+                    setRequestProperty("User-Agent", "HibahIlmu-Android-Native/3.0")
                 }
                 val code = conn.responseCode
                 if (code in 200..299) {
@@ -111,11 +110,9 @@ object IotCloudApiService {
         throw Exception(errorTerakhir)
     }
 
-    // ========================================================================
-    // 1A. LOGIN & REGISTER REGULER (EMAIL & PASSWORD) KE SERVER HIBAHILMU.MY.ID
-    // ========================================================================
+    // 1A. LOGIN & REGISTER REGULER
     suspend fun autentikasiKeServer(
-        action: String, // "login" atau "register"
+        action: String,
         email: String,
         password: String,
         nama: String = "",
@@ -136,10 +133,7 @@ object IotCloudApiService {
             val json = JSONObject(bodyText)
 
             if (code !in 200..299 || !json.optBoolean("ok", false)) {
-                val msg = json.optString(
-                    "message",
-                    json.optString("error", "Gagal autentikasi ke hibahilmu.my.id (HTTP $code)")
-                )
+                val msg = json.optString("message", "Gagal autentikasi (HTTP $code)")
                 return@withContext Result.failure(Exception(msg))
             }
 
@@ -151,19 +145,16 @@ object IotCloudApiService {
                     email = u.optString("email"),
                     role = u.optString("role", "siswa"),
                     instansi = u.optString("instansi", "HibahIlmu Indonesia"),
+                    status = u.optString("status", "approved"),
                     xp = u.optInt("xp", 500)
                 )
             )
         } catch (e: Exception) {
-            Result.failure(
-                Exception("Kendala koneksi ke hibahilmu.my.id: ${e.localizedMessage}")
-            )
+            Result.failure(Exception("Kendala koneksi ke hibahilmu.my.id: ${e.localizedMessage}"))
         }
     }
 
-    // ========================================================================
-    // 1B. LOGIN / REGISTER VIA GOOGLE SSO NATIVE ANDROID KE SERVER HIBAHILMU
-    // ========================================================================
+    // 1B. LOGIN / REGISTER VIA GOOGLE SSO
     suspend fun loginDenganGoogleSsoKeServer(
         idTokenGoogle: String,
         rolePilihan: String = "siswa",
@@ -181,10 +172,7 @@ object IotCloudApiService {
             val json = JSONObject(bodyText)
 
             if (code !in 200..299 || !json.optBoolean("ok", false)) {
-                val msg = json.optString(
-                    "message",
-                    "Verifikasi Google SSO ditolak oleh server (HTTP $code)"
-                )
+                val msg = json.optString("message", "Verifikasi Google SSO ditolak (HTTP $code)")
                 return@withContext Result.failure(Exception(msg))
             }
 
@@ -196,24 +184,45 @@ object IotCloudApiService {
                     email = u.optString("email"),
                     role = u.optString("role", rolePilihan),
                     instansi = u.optString("instansi", "Google Verified Account"),
+                    status = u.optString("status", "approved"),
                     xp = u.optInt("xp", 550)
                 )
             )
         } catch (e: Exception) {
-            Result.failure(
-                Exception("Gagal memverifikasi token Google ke server hibahilmu.my.id: ${e.localizedMessage}")
-            )
+            Result.failure(Exception("Gagal verifikasi Google ke server: ${e.localizedMessage}"))
         }
     }
 
-    // ========================================================================
-    // 2. AMBIL DATA KELAS, MODUL, KUIS, TRYOUT CBT & FORUM DARI SERVER
-    // ========================================================================
+    // 2. AMBIL SELURUH KONTEN KURIKULUM + DAFTAR AKUN TERDAFTAR DARI SERVER
     suspend fun ambilKontenUtamaDariServer(): Result<ServerContentBundle> =
         withContext(Dispatchers.IO) {
             try {
                 val text = eksekusiGetJson("/api/mobile/content")
                 val root = JSONObject(text)
+
+                // Ambil juga daftar akun dari /api/mobile/auth untuk Leaderboard & Monitoring Siswa/Admin
+                val listAkunServer = mutableListOf<UserAccount>()
+                try {
+                    val authText = eksekusiGetJson("/api/mobile/auth")
+                    val authRoot = JSONObject(authText)
+                    val accArr = authRoot.optJSONArray("daftarEmailTerdaftar")
+                    if (accArr != null) {
+                        for (i in 0 until accArr.length()) {
+                            val a = accArr.getJSONObject(i)
+                            listAkunServer.add(
+                                UserAccount(
+                                    id = a.optString("id", "usr-$i"),
+                                    nama = a.optString("nama"),
+                                    email = a.optString("email"),
+                                    role = a.optString("role", "siswa"),
+                                    instansi = a.optString("infoTambahan", "HibahIlmu"),
+                                    status = a.optString("status", "approved"),
+                                    xp = a.optInt("xp", 500)
+                                )
+                            )
+                        }
+                    }
+                } catch (_: Exception) {}
 
                 val jenjangArr = root.optJSONArray("jenjangList")
                 val listJenjang = mutableListOf<JenjangNativeItem>()
@@ -359,6 +368,22 @@ object IotCloudApiService {
                 if (forumArr != null) {
                     for (i in 0 until forumArr.length()) {
                         val fObj = forumArr.getJSONObject(i)
+                        val jwbArr = fObj.optJSONArray("jawaban")
+                        val listJwb = mutableListOf<JawabanDiskusiNative>()
+                        if (jwbArr != null) {
+                            for (j in 0 until jwbArr.length()) {
+                                val jo = jwbArr.getJSONObject(j)
+                                listJwb.add(
+                                    JawabanDiskusiNative(
+                                        id = jo.optString("id"),
+                                        penjawab = jo.optString("penjawab"),
+                                        role = jo.optString("role", "Guru"),
+                                        isi = jo.optString("isi"),
+                                        waktu = jo.optString("waktu", "Baru saja")
+                                    )
+                                )
+                            }
+                        }
                         listForum.add(
                             DiskusiPrNativeItem(
                                 id = fObj.optString("id"),
@@ -368,44 +393,81 @@ object IotCloudApiService {
                                 judul = fObj.optString("judul"),
                                 pertanyaan = fObj.optString("pertanyaan"),
                                 waktu = fObj.optString("waktu"),
-                                likes = fObj.optInt("likes", 1)
+                                likes = fObj.optInt("likes", 1),
+                                solved = fObj.optBoolean("solved", false),
+                                jawaban = listJwb
+                            )
+                        )
+                    }
+                }
+
+                val bswArr = root.optJSONArray("beasiswaList")
+                val listBeasiswa = mutableListOf<PengajuanBeasiswaNative>()
+                if (bswArr != null) {
+                    for (i in 0 until bswArr.length()) {
+                        val bObj = bswArr.getJSONObject(i)
+                        listBeasiswa.add(
+                            PengajuanBeasiswaNative(
+                                id = bObj.optString("id"),
+                                namaPemohon = bObj.optString("namaPemohon"),
+                                asalSekolahKampus = bObj.optString("asalSekolahKampus"),
+                                jenjang = bObj.optString("jenjang"),
+                                alasanPengajuan = bObj.optString("alasanPengajuan"),
+                                statusVerifikasi = bObj.optString("statusVerifikasi", "pending"),
+                                waktuPengajuan = bObj.optString("waktuPengajuan")
                             )
                         )
                     }
                 }
 
                 Result.success(
-                    ServerContentBundle(listJenjang, listTryout, listWebinar, listForum)
+                    ServerContentBundle(
+                        listJenjang,
+                        listTryout,
+                        listWebinar,
+                        listForum,
+                        listBeasiswa,
+                        listAkunServer
+                    )
                 )
             } catch (e: Exception) {
                 Result.failure(e)
             }
         }
 
-    suspend fun kirimPertanyaanForumKeServer(
-        penanya: String,
-        mapel: String,
-        judul: String,
-        pertanyaan: String
-    ): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val payload = JSONObject().apply {
-                put("action", "tambah_diskusi")
-                put("penanya", penanya)
-                put("mapel", mapel)
-                put("judul", judul)
-                put("pertanyaan", pertanyaan)
+    // 3. AKSI KHUSUS GURU & SISWA KE SERVER (/api/mobile/content)
+    suspend fun kirimAksiKontenKeServer(payload: JSONObject): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val (code, body) = eksekusiPostJsonAntiRedirect("/api/mobile/content", payload)
+                val json = JSONObject(body)
+                if (code in 200..299 && json.optBoolean("ok", false)) {
+                    Result.success(json.optString("message", "Berhasil disimpan ke server!"))
+                } else {
+                    Result.failure(Exception("Gagal menyimpan ke server (HTTP $code)"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-            val (code, _) = eksekusiPostJsonAntiRedirect("/api/mobile/content", payload)
-            Result.success(code in 200..299)
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
-    // ========================================================================
-    // 3. SINKRONISASI REAL-TIME IOT CLOUD & BLYNK BROKER
-    // ========================================================================
+    // 4. AKSI KHUSUS ADMIN (UBAH STATUS / HAPUS AKUN DI SERVER)
+    suspend fun adminKelolaAkunServer(action: String, userId: String, statusBaru: String = "approved"): Result<Boolean> =
+        withContext(Dispatchers.IO) {
+            try {
+                val payload = JSONObject().apply {
+                    put("action", action)
+                    put("userId", userId)
+                    put("status", statusBaru)
+                }
+                val (code, _) = eksekusiPostJsonAntiRedirect("/api/mobile/auth", payload)
+                Result.success(code in 200..299)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    // 5. SINKRONISASI REAL-TIME IOT CLOUD & BLYNK BROKER
     suspend fun ambilStatePinDariServer(token: String): Result<CloudIotState> =
         withContext(Dispatchers.IO) {
             try {

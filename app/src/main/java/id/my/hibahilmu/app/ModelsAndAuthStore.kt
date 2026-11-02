@@ -1,15 +1,15 @@
 package id.my.hibahilmu.app
 
 import android.content.Context
-import org.json.JSONObject
 import kotlin.math.abs
 
 data class UserAccount(
     val id: String,
     val nama: String,
     val email: String,
-    val role: String,
+    val role: String, // "siswa", "guru", atau "admin"
     val instansi: String,
+    val status: String = "approved",
     val xp: Int = 500
 )
 
@@ -68,6 +68,14 @@ data class WebinarNativeItem(
     val sedangLive: Boolean
 )
 
+data class JawabanDiskusiNative(
+    val id: String,
+    val penjawab: String,
+    val role: String,
+    val isi: String,
+    val waktu: String
+)
+
 data class DiskusiPrNativeItem(
     val id: String,
     val penanya: String,
@@ -76,7 +84,19 @@ data class DiskusiPrNativeItem(
     val judul: String,
     val pertanyaan: String,
     val waktu: String,
-    val likes: Int
+    val likes: Int,
+    val solved: Boolean = false,
+    val jawaban: List<JawabanDiskusiNative> = emptyList()
+)
+
+data class PengajuanBeasiswaNative(
+    val id: String,
+    val namaPemohon: String,
+    val asalSekolahKampus: String,
+    val jenjang: String,
+    val alasanPengajuan: String,
+    val statusVerifikasi: String,
+    val waktuPengajuan: String
 )
 
 data class LogPesanIot(
