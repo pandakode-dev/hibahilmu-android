@@ -12,10 +12,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,19 +51,104 @@ import org.json.JSONObject
 import java.security.MessageDigest
 import kotlin.math.roundToInt
 
+// ============================================================================
+// SISTEM 4 TEMA WARNA CERAH & MENARIK (DEFAULT: ZAMRUD CERAH / MINT DAYLIGHT)
+// ============================================================================
+enum class HibahVisualTheme(
+    val id: String,
+    val label: String,
+    val ikon: String,
+    val bgUtama: Color,
+    val bgKartu: Color,
+    val teksUtama: Color,
+    val teksSekunder: Color,
+    val aksenPrimer: Color,
+    val headerGradStart: Color,
+    val headerGradEnd: Color,
+    val borderKartu: Color
+) {
+    MINT_CERAH(
+        id = "mint",
+        label = "Zamrud Cerah",
+        ikon = "🌿",
+        bgUtama = Color(0xFFF0FDF4),
+        bgKartu = Color(0xFFFFFFFF),
+        teksUtama = Color(0xFF0F172A),
+        teksSekunder = Color(0xFF475569),
+        aksenPrimer = Color(0xFF059669),
+        headerGradStart = Color(0xFF065F46),
+        headerGradEnd = Color(0xFF10B981),
+        borderKartu = Color(0xFFBBF7D0)
+    ),
+    SKY_OCEAN(
+        id = "sky",
+        label = "Biru Langit",
+        ikon = "🌊",
+        bgUtama = Color(0xFFF0F9FF),
+        bgKartu = Color(0xFFFFFFFF),
+        teksUtama = Color(0xFF0F172A),
+        teksSekunder = Color(0xFF475569),
+        aksenPrimer = Color(0xFF0284C7),
+        headerGradStart = Color(0xFF075985),
+        headerGradEnd = Color(0xFF0EA5E9),
+        borderKartu = Color(0xFFBAE6FD)
+    ),
+    SUNRISE_GOLD(
+        id = "sunrise",
+        label = "Krem Mentari",
+        ikon = "🌅",
+        bgUtama = Color(0xFFFFFBEB),
+        bgKartu = Color(0xFFFFFFFF),
+        teksUtama = Color(0xFF0F172A),
+        teksSekunder = Color(0xFF57534E),
+        aksenPrimer = Color(0xFFD97706),
+        headerGradStart = Color(0xFF9A3412),
+        headerGradEnd = Color(0xFFF59E0B),
+        borderKartu = Color(0xFFFDE68A)
+    ),
+    DARK_CYBER(
+        id = "dark",
+        label = "Malam Cyber",
+        ikon = "🌌",
+        bgUtama = Color(0xFF090D16),
+        bgKartu = Color(0xFF0F172A),
+        teksUtama = Color(0xFFFFFFFF),
+        teksSekunder = Color(0xFF94A3B8),
+        aksenPrimer = Color(0xFF10B981),
+        headerGradStart = Color(0xFF0F172A),
+        headerGradEnd = Color(0xFF1E1B4B),
+        borderKartu = Color(0xFF334155)
+    )
+}
+
+val LocalHibahTheme = compositionLocalOf { HibahVisualTheme.MINT_CERAH }
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = Color(0xFF10B981),
-                    secondary = Color(0xFF6366F1),
-                    background = Color(0xFF090D16),
-                    surface = Color(0xFF0F172A)
-                )
-            ) {
-                AplikasiNativeHibahIlmu()
+            var temaPilihan by remember { mutableStateOf(HibahVisualTheme.MINT_CERAH) }
+            CompositionLocalProvider(LocalHibahTheme provides temaPilihan) {
+                MaterialTheme(
+                    colorScheme = if (temaPilihan == HibahVisualTheme.DARK_CYBER) {
+                        darkColorScheme(
+                            primary = temaPilihan.aksenPrimer,
+                            background = temaPilihan.bgUtama,
+                            surface = temaPilihan.bgKartu
+                        )
+                    } else {
+                        lightColorScheme(
+                            primary = temaPilihan.aksenPrimer,
+                            background = temaPilihan.bgUtama,
+                            surface = temaPilihan.bgKartu
+                        )
+                    }
+                ) {
+                    AplikasiNativeHibahIlmu(
+                        temaAktif = temaPilihan,
+                        onGantiTema = { temaPilihan = it }
+                    )
+                }
             }
         }
     }
@@ -95,12 +182,15 @@ fun ambilSha1Aplikasi(context: Context): String {
 }
 
 @Composable
-fun AplikasiNativeHibahIlmu() {
+fun AplikasiNativeHibahIlmu(
+    temaAktif: HibahVisualTheme,
+    onGantiTema: (HibahVisualTheme) -> Unit
+) {
     var tampilSplash by remember { mutableStateOf(true) }
     var userAktif by remember { mutableStateOf<UserAccount?>(null) }
 
     LaunchedEffect(Unit) {
-        delay(1000)
+        delay(900)
         tampilSplash = false
     }
 
@@ -115,6 +205,8 @@ fun AplikasiNativeHibahIlmu() {
     } else {
         DashboardNativeUtama(
             user = userAktif!!,
+            temaAktif = temaAktif,
+            onGantiTema = onGantiTema,
             onLogout = { userAktif = null }
         )
     }
@@ -127,38 +219,42 @@ fun SplashScreenNative() {
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF022C22))
+                    listOf(Color(0xFF065F46), Color(0xFF059669), Color(0xFF10B981))
                 )
             ),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = Color(0xFF10B981).copy(alpha = 0.2f),
-                modifier = Modifier.size(92.dp)
+                shape = RoundedCornerShape(32.dp),
+                color = Color.White,
+                modifier = Modifier
+                    .size(104.dp)
+                    .border(3.dp, Color(0xFFFACC15), RoundedCornerShape(32.dp))
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Memory,
-                        contentDescription = null,
-                        tint = Color(0xFF34D399),
-                        modifier = Modifier.size(52.dp)
-                    )
+                    Text("🐼", fontSize = 54.sp)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Text("HibahIlmu Native App", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
-            Text("MULTI-ROLE (SISWA • GURU • ADMIN) & IOT CLOUD", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "Panda HibahIlmu Native",
+                color = Color.White,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black
+            )
+            Text(
+                "TALENT MAPPING • WOKWI IOT • MULTI-ROLE",
+                color = Color(0xFFFDE047),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black
+            )
             Spacer(modifier = Modifier.height(24.dp))
-            CircularProgressIndicator(color = Color(0xFF10B981), strokeWidth = 3.dp)
+            CircularProgressIndicator(color = Color(0xFFFACC15), strokeWidth = 3.dp)
         }
     }
 }
 
-// ============================================================================
-// GERBANG LOGIN & REGISTER WAJIB ONLINE + GOOGLE SSO (PILIH PERAN SISWA / GURU / ADMIN)
-// ============================================================================
 @Suppress("DEPRECATION")
 @Composable
 fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) {
@@ -167,7 +263,7 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
     val scope = rememberCoroutineScope()
 
     var modeRegister by remember { mutableStateOf(false) }
-    var pilihRole by remember { mutableStateOf("siswa") } // "siswa", "guru", "admin"
+    var pilihRole by remember { mutableStateOf("siswa") }
 
     var inputNama by remember { mutableStateOf("") }
     var inputEmail by remember { mutableStateOf("siswa@hibahilmu.id") }
@@ -277,7 +373,11 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF090D16))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFFECFDF5), Color(0xFFE0F2FE), Color(0xFFFFFBEB))
+                )
+            )
             .padding(18.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -285,20 +385,20 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xFF0F172A))
-                .border(2.dp, Color(0xFF1E293B), RoundedCornerShape(28.dp))
+                .background(Color.White)
+                .border(2.dp, Color(0xFF10B981), RoundedCornerShape(28.dp))
                 .padding(22.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Surface(
-                color = Color(0xFF10B981).copy(alpha = 0.15f),
+                color = Color(0xFFDCFCE7),
                 shape = RoundedCornerShape(50),
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
                 Text(
-                    text = "☁️ DATABASE TERPUSAT HIBAHILMU.MY.ID",
-                    color = Color(0xFF34D399),
+                    text = "🐼 PANDA HIBAHILMU • TALENT MAPPING & WOKWI IOT",
+                    color = Color(0xFF065F46),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Black,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
@@ -307,24 +407,23 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
 
             Text(
                 text = if (modeRegister) "Registrasi Akun Baru" else "Masuk ke HibahIlmu",
-                color = Color.White,
+                color = Color(0xFF0F172A),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Black
             )
             Text(
-                text = "Pilih peran untuk membuka fitur Siswa, Studio Guru, atau Admin:",
-                color = Color(0xFF94A3B8),
+                text = "Pilih peran untuk membuka Talent Mapping, Kelas, Studio Guru, atau Admin:",
+                color = Color(0xFF475569),
                 fontSize = 11.sp
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3 Pilihan Role: Siswa | Guru / Dosen | Admin
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF020617))
+                    .background(Color(0xFFF1F5F9))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -340,9 +439,9 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                             .clip(RoundedCornerShape(12.dp))
                             .background(
                                 if (!aktif) Color.Transparent
-                                else if (kode == "guru") Color(0xFF6366F1)
-                                else if (kode == "admin") Color(0xFFF59E0B)
-                                else Color(0xFF10B981)
+                                else if (kode == "guru") Color(0xFF4F46E5)
+                                else if (kode == "admin") Color(0xFFD97706)
+                                else Color(0xFF059669)
                             )
                             .clickable {
                                 pilihRole = kode
@@ -368,7 +467,7 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                     ) {
                         Text(
                             text = label,
-                            color = if (aktif && kode != "guru") Color(0xFF022C22) else Color.White,
+                            color = if (aktif) Color.White else Color(0xFF334155),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Black
                         )
@@ -381,20 +480,20 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
             Button(
                 enabled = !sedangMemeriksaServer,
                 onClick = { jalankanLoginGoogleNativeAndroid() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F172A)),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.AccountCircle,
                     contentDescription = "Google",
-                    tint = Color(0xFFEA4335),
+                    tint = Color(0xFFFACC15),
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Login / Daftar Google (${pilihRole.uppercase()})",
-                    color = Color(0xFF0F172A),
+                    color = Color.White,
                     fontWeight = FontWeight.Black,
                     fontSize = 12.sp
                 )
@@ -403,7 +502,7 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
             TextButton(onClick = { tampilkanInfoSha1 = !tampilkanInfoSha1 }) {
                 Text(
                     text = if (tampilkanInfoSha1) "▲ Sembunyikan SHA-1" else "🔍 Cek SHA-1 Aplikasi",
-                    color = Color(0xFFFBBF24),
+                    color = Color(0xFF0284C7),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -414,10 +513,16 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF020617))
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
                         .padding(10.dp)
                 ) {
-                    Text("SHA-1: $sha1Terdeteksi", color = Color(0xFF34D399), fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                    Text(
+                        "SHA-1: $sha1Terdeteksi",
+                        color = Color(0xFF065F46),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
                     Button(
                         onClick = {
                             clipboard.setText(AnnotatedString(sha1Terdeteksi))
@@ -469,10 +574,14 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
 
             if (pesanErrorServer != null) {
                 Spacer(modifier = Modifier.height(10.dp))
-                Surface(color = Color(0xFF7F1D1D), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    color = Color(0xFFFEE2E2),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
                         text = "❌ $pesanErrorServer",
-                        color = Color(0xFFFECACA),
+                        color = Color(0xFF991B1B),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(12.dp)
@@ -505,13 +614,13 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
                         }
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
                 Text(
                     text = if (sedangMemeriksaServer) "Menghubungi Server..." else if (modeRegister) "Daftarkan Akun Baru" else "Masuk (${pilihRole.uppercase()})",
-                    color = Color(0xFF022C22),
+                    color = Color.White,
                     fontWeight = FontWeight.Black
                 )
             }
@@ -519,7 +628,7 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
             TextButton(onClick = { modeRegister = !modeRegister }) {
                 Text(
                     text = if (modeRegister) "Sudah punya akun? Login" else "Belum punya akun? Daftar Manual",
-                    color = Color(0xFF38BDF8),
+                    color = Color(0xFF0284C7),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -528,11 +637,13 @@ fun LayarLoginOnlineWajibServer(onLoginSuksesDariServer: (UserAccount) -> Unit) 
     }
 }
 
-// ============================================================================
-// DASHBOARD NATIVE UTAMA — MENYESUAIKAN FITUR BERDASARKAN ROLE (SISWA / GURU / ADMIN)
-// ============================================================================
 @Composable
-fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
+fun DashboardNativeUtama(
+    user: UserAccount,
+    temaAktif: HibahVisualTheme,
+    onGantiTema: (HibahVisualTheme) -> Unit,
+    onLogout: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -541,15 +652,16 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
 
     var tabAktif by remember { mutableStateOf(0) }
     var xpPengguna by remember { mutableStateOf(user.xp) }
+    var bukaPemilihTema by remember { mutableStateOf(false) }
 
     var sedangMemuatKonten by remember { mutableStateOf(true) }
     var pesanErrorKonten by remember { mutableStateOf<String?>(null) }
-    var daftarJenjang by remember { mutableStateOf<List<JenjangNativeItem>>(emptyList()) }
-    var daftarTryout by remember { mutableStateOf<List<PaketTryoutNative>>(emptyList()) }
-    var daftarWebinar by remember { mutableStateOf<List<WebinarNativeItem>>(emptyList()) }
-    var daftarForum by remember { mutableStateOf<List<DiskusiPrNativeItem>>(emptyList()) }
-    var daftarBeasiswa by remember { mutableStateOf<List<PengajuanBeasiswaNative>>(emptyList()) }
-    var daftarSemuaAkun by remember { mutableStateOf<List<UserAccount>>(emptyList()) }
+    var daftarJenjang by remember { mutableStateOf(listOf<JenjangNativeItem>()) }
+    var daftarTryout by remember { mutableStateOf(listOf<PaketTryoutNative>()) }
+    var daftarWebinar by remember { mutableStateOf(listOf<WebinarNativeItem>()) }
+    var daftarForum by remember { mutableStateOf(listOf<DiskusiPrNativeItem>()) }
+    var daftarBeasiswa by remember { mutableStateOf(listOf<PengajuanBeasiswaNative>()) }
+    var daftarSemuaAkun by remember { mutableStateOf(listOf<UserAccount>()) }
 
     val daftarProjectPreset = listOf(
         "proj-1" to "Proyek 1: Lampu Jalan LDR + Relay",
@@ -590,69 +702,212 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
 
     Scaffold(
         topBar = {
-            Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF0F172A))) {
-                // Banner Status Role Berbeda Warna antara Siswa, Guru, dan Admin
-                Box(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(temaAktif.headerGradStart, temaAktif.headerGradEnd)
+                        )
+                    )
+            ) {
+                // Baris Status Role + Pemilih 4 Tema Cerah + Shortcut Forum
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            if (isAdmin) Color(0xFFD97706)
-                            else if (isGuru) Color(0xFF4F46E5)
-                            else Color(0xFF059669)
-                        )
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .background(Color.Black.copy(alpha = 0.18f))
+                        .padding(horizontal = 14.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isAdmin) "🛡️ MODE SUPER ADMIN SERVER (${daftarSemuaAkun.size} Akun Terdaftar)"
-                        else if (isGuru) "👨‍🏫 MODE STUDIO PENGAJAR / GURU — Kelola Modul, CBT, Webinar & PR Siswa"
-                        else "🎓 MODE PELAJAR / MAHASISWA — Kurikulum, CBT, IoT Blynk & Beasiswa",
+                        text = if (isAdmin) "🛡️ SUPER ADMIN (${daftarSemuaAkun.size} Akun)"
+                        else if (isGuru) "👨‍🏫 STUDIO GURU & DOSEN"
+                        else "🎓 PELAJAR & TALENT CENTER",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black
                     )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // TOMBOL GANTI TEMA CERAH
+                        Surface(
+                            color = Color.White.copy(alpha = 0.22f),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.clickable { bukaPemilihTema = !bukaPemilihTema }
+                        ) {
+                            Text(
+                                text = "${temaAktif.ikon} Tema: ${temaAktif.label}",
+                                color = Color.White,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.28f),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.clickable { tabAktif = 5 }
+                        ) {
+                            Text(
+                                text = "💬 Forum & Live",
+                                color = Color(0xFFFDE68A),
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Bar Pemilih 4 Tema Warna Cerah (Jika Diklik)
+                if (bukaPemilihTema) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🎨 Pilih Tema:", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color(0xFF0F172A))
+                        HibahVisualTheme.entries.forEach { tm ->
+                            val dipilih = tm == temaAktif
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (dipilih) tm.aksenPrimer else Color(0xFFF1F5F9),
+                                modifier = Modifier
+                                    .border(1.dp, tm.aksenPrimer, RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        onGantiTema(tm)
+                                        bukaPemilihTema = false
+                                    }
+                            ) {
+                                Text(
+                                    text = "${tm.ikon} ${tm.label}",
+                                    color = if (dipilih) Color.White else Color(0xFF0F172A),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(user.nama, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                        Text("${user.email} • ${user.instansi}", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .border(2.dp, Color(0xFFFACC15), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🐼", fontSize = 20.sp)
+                        }
+                        Column {
+                            Text(
+                                user.nama,
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp,
+                                maxLines = 1
+                            )
+                            Text(
+                                "${user.email} • ${user.instansi}",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 10.sp,
+                                maxLines = 1
+                            )
+                        }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFFE11D48), Color(0xFFF59E0B))
+                                    )
+                                )
+                                .border(
+                                    width = 1.5.dp,
+                                    color = Color.White,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clickable { tabAktif = 4 }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "🔥 Talent Mapping",
+                                color = Color.White,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1
+                            )
+                        }
+
                         Surface(
-                            color = Color(0xFFF59E0B).copy(alpha = 0.2f),
+                            color = Color.White.copy(alpha = 0.22f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                text = "🔥 $xpPengguna XP",
-                                color = Color(0xFFFBBF24),
-                                fontSize = 11.sp,
+                                text = "⚡ $xpPengguna",
+                                color = Color(0xFFFDE047),
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                             )
                         }
-                        IconButton(onClick = onLogout) {
-                            Icon(Icons.Default.Logout, contentDescription = "Keluar", tint = Color(0xFFF87171))
+
+                        IconButton(
+                            onClick = onLogout,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Logout,
+                                contentDescription = "Keluar",
+                                tint = Color(0xFFFECACA),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = Color(0xFF0F172A)) {
+            NavigationBar(
+                containerColor = Color.White,
+                tonalElevation = 12.dp,
+                modifier = Modifier.border(1.dp, Color(0xFFE2E8F0))
+            ) {
                 NavigationBarItem(
                     selected = tabAktif == 0,
                     onClick = { tabAktif = 0 },
                     icon = { Icon(Icons.Default.MenuBook, contentDescription = null) },
-                    label = { Text("Kelas", fontSize = 9.5.sp, fontWeight = FontWeight.Bold) }
+                    label = { Text("Kelas", fontSize = 9.5.sp, fontWeight = FontWeight.Black, maxLines = 1) }
                 )
-                // TAB KE-2 BERBEDA SESUAI ROLE: STUDIO GURU vs PANEL ADMIN vs BEASISWA SISWA!
                 NavigationBarItem(
                     selected = tabAktif == 1,
                     onClick = { tabAktif = 1 },
@@ -666,11 +921,12 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
                     },
                     label = {
                         Text(
-                            if (isAdmin) "Data Akun"
-                            else if (isGuru) "Studio Guru"
+                            if (isAdmin) "Admin"
+                            else if (isGuru) "Studio"
                             else "Beasiswa",
                             fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1
                         )
                     }
                 )
@@ -678,19 +934,33 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
                     selected = tabAktif == 2,
                     onClick = { tabAktif = 2 },
                     icon = { Icon(Icons.Default.SettingsRemote, contentDescription = null) },
-                    label = { Text("IoT Blynk", fontSize = 9.5.sp, fontWeight = FontWeight.Bold) }
+                    label = { Text("IoT Lab", fontSize = 9.5.sp, fontWeight = FontWeight.Black, maxLines = 1) }
                 )
                 NavigationBarItem(
                     selected = tabAktif == 3,
                     onClick = { tabAktif = 3 },
-                    icon = { Icon(Icons.Default.Quiz, contentDescription = null) },
-                    label = { Text("CBT Ujian", fontSize = 9.5.sp, fontWeight = FontWeight.Bold) }
+                    icon = { Icon(Icons.Default.Memory, contentDescription = null) },
+                    label = { Text("Wokwi", fontSize = 9.5.sp, fontWeight = FontWeight.Black, maxLines = 1) }
                 )
                 NavigationBarItem(
                     selected = tabAktif == 4,
                     onClick = { tabAktif = 4 },
-                    icon = { Icon(Icons.Default.Forum, contentDescription = null) },
-                    label = { Text("Forum & Live", fontSize = 9.5.sp, fontWeight = FontWeight.Bold) }
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
+                        selectedTextColor = Color(0xFFE11D48),
+                        indicatorColor = Color(0xFFE11D48),
+                        unselectedIconColor = Color(0xFFE11D48),
+                        unselectedTextColor = Color(0xFFBE123C)
+                    ),
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                    label = {
+                        Text(
+                            "🔥 Talent",
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1
+                        )
+                    }
                 )
             }
         }
@@ -698,7 +968,7 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF090D16))
+                .background(temaAktif.bgUtama)
                 .padding(innerPadding)
         ) {
             when (tabAktif) {
@@ -707,7 +977,9 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
                     pesanError = pesanErrorKonten,
                     daftarJenjang = daftarJenjang,
                     onRefresh = { muatUlangDataServer() },
-                    onTambahXp = { xpPengguna += it }
+                    onTambahXp = { xpPengguna += it },
+                    onBukaTalentMapping = { tabAktif = 4 },
+                    onBukaForumLive = { tabAktif = 5 }
                 )
                 1 -> {
                     if (isAdmin) {
@@ -738,47 +1010,51 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
                     }
                 }
                 2 -> {
-                    var subModeTabIot by remember { mutableStateOf(0) } // 0: Simulator Sensor & Bahasa, 1: Remote Blynk
+                    var subModeTabIot by remember { mutableStateOf(0) }
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFF0F172A))
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                                .background(Color.White)
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Button(
                                 onClick = { subModeTabIot = 0 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (subModeTabIot == 0) Color(0xFF10B981) else Color(0xFF1E293B)
+                                    containerColor = if (subModeTabIot == 0) temaAktif.aksenPrimer else Color(0xFFE2E8F0)
                                 ),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(
-                                    "🔬 Lab Sensor, MATLAB & C++",
-                                    color = if (subModeTabIot == 0) Color(0xFF022C22) else Color.White,
+                                    "🔬 Multi-Lab & Osiloskop",
+                                    color = if (subModeTabIot == 0) Color.White else Color(0xFF1E293B),
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1
                                 )
                             }
                             Button(
                                 onClick = { subModeTabIot = 1 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (subModeTabIot == 1) Color(0xFF10B981) else Color(0xFF1E293B)
+                                    containerColor = if (subModeTabIot == 1) temaAktif.aksenPrimer else Color(0xFFE2E8F0)
                                 ),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(
                                     "📱 Remote Blynk Cloud",
-                                    color = if (subModeTabIot == 1) Color(0xFF022C22) else Color.White,
+                                    color = if (subModeTabIot == 1) Color.White else Color(0xFF1E293B),
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 1
                                 )
                             }
                         }
 
                         if (subModeTabIot == 0) {
-                            LayarSimulatorMultiLabAndroid(
+                            LayarSimulatorMultiLabWebSync(
                                 user = user,
                                 tokenAktif = tokenAktif,
                                 onTambahXp = { xpPengguna += it }
@@ -804,13 +1080,20 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
                     }
                 }
                 3 -> {
-                    LayarSimulatorWokwiDanSensorLengkap(
+                    LayarSimulatorWokwiWebSync(
                         user = user,
                         tokenAktif = tokenAktif,
                         onTambahXp = { xpPengguna += it }
                     )
                 }
-                4 -> MenuForumDanWebinarNative(
+                4 -> {
+                    TalentMappingMainScreen(
+                        namaUserDefault = user.nama,
+                        emailUserDefault = user.email,
+                        onBack = { tabAktif = 0 }
+                    )
+                }
+                5 -> MenuForumDanWebinarNative(
                     user = user,
                     daftarWebinar = daftarWebinar,
                     daftarForum = daftarForum,
@@ -822,534 +1105,8 @@ fun DashboardNativeUtama(user: UserAccount, onLogout: () -> Unit) {
 }
 
 // ============================================================================
-// FITUR KHUSUS ROLE GURU / DOSEN: STUDIO PENGAJAR NATIVE
-// (Buat Modul & Bab, Buat Soal CBT, Buat Live Webinar, & Pantau Siswa)
-// ============================================================================
-@Composable
-fun MenuStudioPengajarGuruNative(
-    guru: UserAccount,
-    daftarJenjang: List<JenjangNativeItem>,
-    daftarAkun: List<UserAccount>,
-    onSuksesSimpanKeServer: () -> Unit
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var subMenuGuru by remember { mutableStateOf(0) } // 0: Buat Modul, 1: Buat CBT, 2: Buat Webinar, 3: Data Siswa
-
-    // State Form Modul Baru
-    var jenjangTarget by remember { mutableStateOf("sma") }
-    var judulModul by remember { mutableStateOf("") }
-    var rangkumanModul by remember { mutableStateOf("") }
-    var judulBab by remember { mutableStateOf("Bab 1: Konsep Dasar & Implementasi") }
-    var isiBab by remember { mutableStateOf("") }
-    var rumusBab by remember { mutableStateOf("") }
-    var tanyaKuis by remember { mutableStateOf("") }
-    var opsiA by remember { mutableStateOf("") }
-    var opsiB by remember { mutableStateOf("") }
-    var opsiC by remember { mutableStateOf("") }
-    var opsiD by remember { mutableStateOf("") }
-    var pembahasanKuis by remember { mutableStateOf("") }
-
-    // State Form CBT Baru
-    var judulCbt by remember { mutableStateOf("") }
-    var kategoriCbt by remember { mutableStateOf("UTBK") }
-    var soalCbt by remember { mutableStateOf("") }
-    var cbtOpsiA by remember { mutableStateOf("") }
-    var cbtOpsiB by remember { mutableStateOf("") }
-    var cbtOpsiC by remember { mutableStateOf("") }
-    var cbtOpsiD by remember { mutableStateOf("") }
-    var bahasCbt by remember { mutableStateOf("") }
-
-    // State Form Live Webinar Baru
-    var judulWebinar by remember { mutableStateOf("") }
-    var jadwalWebinar by remember { mutableStateOf("Minggu, 19:30 WIB") }
-    var linkMeetWebinar by remember { mutableStateOf("https://meet.google.com/hibah-ilmu") }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF312E81), Color(0xFF4F46E5))))
-                    .padding(18.dp)
-            ) {
-                Text("👨‍🏫 STUDIO PENGAJAR & DOSEN NATIVE", color = Color(0xFFFBBF24), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                Text("Kelola Kurikulum Server hibahilmu.my.id", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Black)
-                Text("Modul, CBT, dan Webinar yang Anda buat langsung tampil di HP seluruh Siswa & Website!", color = Color(0xFFE0E7FF), fontSize = 11.sp)
-            }
-        }
-
-        // Sub-Tab Navigasi Studio Guru
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(
-                    0 to "+ Modul & Bab",
-                    1 to "+ Ujian CBT",
-                    2 to "+ Live Kelas",
-                    3 to "Siswa (${daftarAkun.count { it.role == "siswa" }})"
-                ).forEach { (idx, label) ->
-                    val dipilih = subMenuGuru == idx
-                    Surface(
-                        color = if (dipilih) Color(0xFF10B981) else Color(0xFF1E293B),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f).clickable { subMenuGuru = idx }
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (dipilih) Color(0xFF022C22) else Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        if (subMenuGuru == 0) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF4F46E5), RoundedCornerShape(20.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("📚 TERBITKAN MODUL KELAS, BAB & KUIS BARU", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Black)
-
-                    Text("Pilih Jenjang Target:", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("sd" to "SD", "smp" to "SMP", "sma" to "SMA/SMK", "kuliah" to "Kuliah").forEach { (idJ, namaJ) ->
-                            Surface(
-                                color = if (jenjangTarget == idJ) Color(0xFF4F46E5) else Color(0xFF1E293B),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.clickable { jenjangTarget = idJ }
-                            ) {
-                                Text(namaJ, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(value = judulModul, onValueChange = { judulModul = it }, label = { Text("Judul Modul Kelas Baru") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = rangkumanModul, onValueChange = { rangkumanModul = it }, label = { Text("Rangkuman Singkat Modul") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = judulBab, onValueChange = { judulBab = it }, label = { Text("Judul Bab 1") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = isiBab, onValueChange = { isiBab = it }, label = { Text("Uraian Materi Lengkap Bab 1") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = rumusBab, onValueChange = { rumusBab = it }, label = { Text("Rumus Fisika/Matematika/Kode (Opsional)") }, modifier = Modifier.fillMaxWidth())
-
-                    HorizontalDivider(color = Color(0xFF1E293B))
-                    Text("📝 Tambahkan Soal Kuis Evaluasi Modul:", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                    OutlinedTextField(value = tanyaKuis, onValueChange = { tanyaKuis = it }, label = { Text("Pertanyaan Kuis") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = opsiA, onValueChange = { opsiA = it }, label = { Text("Opsi A (Jawaban Benar)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = opsiB, onValueChange = { opsiB = it }, label = { Text("Opsi B") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = opsiC, onValueChange = { opsiC = it }, label = { Text("Opsi C") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = opsiD, onValueChange = { opsiD = it }, label = { Text("Opsi D") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = pembahasanKuis, onValueChange = { pembahasanKuis = it }, label = { Text("Pembahasan Kuis") }, modifier = Modifier.fillMaxWidth())
-
-                    Button(
-                        onClick = {
-                            if (judulModul.isBlank() || isiBab.isBlank()) {
-                                Toast.makeText(context, "Judul Modul dan Isi Bab wajib diisi!", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
-                            scope.launch {
-                                val payload = JSONObject().apply {
-                                    put("action", "guru_tambah_modul")
-                                    put("idJenjang", jenjangTarget)
-                                    put("judul", judulModul)
-                                    put("pembuatId", guru.id)
-                                    put("pembuatNama", guru.nama)
-                                    put("rangkuman", rangkumanModul)
-                                    put("judulBab", judulBab)
-                                    put("isiBab", isiBab)
-                                    put("rumus", rumusBab)
-                                    put("pertanyaanKuis", tanyaKuis)
-                                    put("opsiA", opsiA)
-                                    put("opsiB", opsiB)
-                                    put("opsiC", opsiC)
-                                    put("opsiD", opsiD)
-                                    put("jawabanBenar", 0)
-                                    put("pembahasanKuis", pembahasanKuis)
-                                }
-                                val res = IotCloudApiService.kirimAksiKontenKeServer(payload)
-                                res.onSuccess { msg ->
-                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                    judulModul = ""
-                                    rangkumanModul = ""
-                                    isiBab = ""
-                                    tanyaKuis = ""
-                                    onSuksesSimpanKeServer()
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    ) {
-                        Text("Terbitkan Modul ke Server (+100 XP Guru)", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        } else if (subMenuGuru == 1) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF10B981), RoundedCornerShape(20.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("🎯 BUAT PAKET SOAL TRYOUT CBT BARU", color = Color(0xFFFBBF24), fontSize = 12.sp, fontWeight = FontWeight.Black)
-                    OutlinedTextField(value = judulCbt, onValueChange = { judulCbt = it }, label = { Text("Judul Paket Tryout CBT") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = kategoriCbt, onValueChange = { kategoriCbt = it }, label = { Text("Kategori (UTBK / TPA / TOEFL)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = soalCbt, onValueChange = { soalCbt = it }, label = { Text("Pertanyaan Soal CBT") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = cbtOpsiA, onValueChange = { cbtOpsiA = it }, label = { Text("Pilihan A (Kunci Benar)") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = cbtOpsiB, onValueChange = { cbtOpsiB = it }, label = { Text("Pilihan B") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = cbtOpsiC, onValueChange = { cbtOpsiC = it }, label = { Text("Pilihan C") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = cbtOpsiD, onValueChange = { cbtOpsiD = it }, label = { Text("Pilihan D") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = bahasCbt, onValueChange = { bahasCbt = it }, label = { Text("Pembahasan Soal CBT") }, modifier = Modifier.fillMaxWidth())
-
-                    Button(
-                        onClick = {
-                            if (judulCbt.isBlank() || soalCbt.isBlank()) return@Button
-                            scope.launch {
-                                val payload = JSONObject().apply {
-                                    put("action", "guru_tambah_cbt")
-                                    put("judul", judulCbt)
-                                    put("kategoriTes", kategoriCbt)
-                                    put("pertanyaan", soalCbt)
-                                    put("opsiA", cbtOpsiA)
-                                    put("opsiB", cbtOpsiB)
-                                    put("opsiC", cbtOpsiC)
-                                    put("opsiD", cbtOpsiD)
-                                    put("jawabanBenar", 0)
-                                    put("pembahasan", bahasCbt)
-                                }
-                                IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
-                                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                                    judulCbt = ""
-                                    soalCbt = ""
-                                    onSuksesSimpanKeServer()
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    ) {
-                        Text("Simpan Paket CBT ke Server", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        } else if (subMenuGuru == 2) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF0F172A))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("🔴 JADWALKAN LIVE TEACHING / WEBINAR BARU", color = Color(0xFFF87171), fontSize = 12.sp, fontWeight = FontWeight.Black)
-                    OutlinedTextField(value = judulWebinar, onValueChange = { judulWebinar = it }, label = { Text("Judul Sesi Live Kelas / Webinar") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = jadwalWebinar, onValueChange = { jadwalWebinar = it }, label = { Text("Hari & Jam Pelaksanaan") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = linkMeetWebinar, onValueChange = { linkMeetWebinar = it }, label = { Text("Link Zoom / Google Meet / YouTube") }, modifier = Modifier.fillMaxWidth())
-
-                    Button(
-                        onClick = {
-                            if (judulWebinar.isBlank()) return@Button
-                            scope.launch {
-                                val payload = JSONObject().apply {
-                                    put("action", "guru_tambah_webinar")
-                                    put("judulAcara", judulWebinar)
-                                    put("narasumber", guru.nama)
-                                    put("tanggalWaktu", jadwalWebinar)
-                                    put("url", linkMeetWebinar)
-                                }
-                                IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
-                                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                                    judulWebinar = ""
-                                    onSuksesSimpanKeServer()
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    ) {
-                        Text("Terbitkan Jadwal Live Kelas", color = Color.White, fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        } else {
-            item {
-                Text("👨‍🎓 DAFTAR SISWA & PENGGUNA TERDAFTAR DI SERVER (${daftarAkun.size} AKUN):", color = Color(0xFF38BDF8), fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-            items(daftarAkun) { acc ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(16.dp))
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(acc.nama, color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
-                        Text("${acc.email} • ${acc.role.uppercase()}", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                        Text(acc.instansi, color = Color(0xFF34D399), fontSize = 10.sp)
-                    }
-                    Text("🔥 ${acc.xp} XP", color = Color(0xFFFBBF24), fontWeight = FontWeight.Black, fontSize = 12.sp)
-                }
-            }
-        }
-    }
-}
-
-// ============================================================================
-// FITUR KHUSUS ROLE ADMIN: KELOLA SELURUH AKUN SERVER (TERMASUK GOOGLE SSO)
-// ============================================================================
-@Composable
-fun MenuPanelAdminServerNative(
-    daftarAkun: List<UserAccount>,
-    daftarBeasiswa: List<PengajuanBeasiswaNative>,
-    onRefresh: () -> Unit
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("PANEL SUPER ADMIN NATIVE", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                    Text("Data Akun Terdaftar (${daftarAkun.size})", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
-                }
-                Button(onClick = onRefresh) {
-                    Text("🔄 Refresh")
-                }
-            }
-        }
-
-        items(daftarAkun) { acc ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(18.dp))
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(acc.nama, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                        Text(acc.email, color = Color(0xFF38BDF8), fontSize = 12.sp)
-                        Text("Role: ${acc.role.uppercase()} • Status: ${acc.status.uppercase()}", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("Info: ${acc.instansi}", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    }
-                    if (acc.role != "admin") {
-                        IconButton(onClick = {
-                            scope.launch {
-                                IotCloudApiService.adminKelolaAkunServer("admin_delete_user", acc.id)
-                                Toast.makeText(context, "Akun dihapus dari server", Toast.LENGTH_SHORT).show()
-                                onRefresh()
-                            }
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFF87171))
-                        }
-                    }
-                }
-            }
-        }
-
-        if (daftarBeasiswa.isNotEmpty()) {
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("🎓 PENGAJUAN BEASISWA MASUK (${daftarBeasiswa.size}):", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-            items(daftarBeasiswa) { bsw ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0F172A))
-                        .padding(14.dp)
-                ) {
-                    Text("${bsw.namaPemohon} (${bsw.asalSekolahKampus})", color = Color.White, fontWeight = FontWeight.Black)
-                    Text("Alasan: ${bsw.alasanPengajuan}", color = Color(0xFFCBD5E1), fontSize = 12.sp)
-                    Text("Status: ${bsw.statusVerifikasi.uppercase()}", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-// ============================================================================
-// FITUR KHUSUS ROLE SISWA: BEASISWA, LEADERBOARD XP, LAPORAN BUG & TOKEN IOT
-// ============================================================================
-@Composable
-fun MenuBeasiswaLeaderboardDanLaporanSiswa(
-    siswa: UserAccount,
-    daftarBeasiswa: List<PengajuanBeasiswaNative>,
-    daftarAkun: List<UserAccount>,
-    tokenAktif: String,
-    onRefresh: () -> Unit,
-    onLogout: () -> Unit
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var alasanBeasiswa by remember { mutableStateOf("") }
-    var linkBerkasBeasiswa by remember { mutableStateOf("") }
-    var judulLaporanBug by remember { mutableStateOf("") }
-    var isiLaporanBug by remember { mutableStateOf("") }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // 1. Papan Peringkat (Leaderboard XP)
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFFF59E0B), RoundedCornerShape(22.dp))
-                    .padding(16.dp)
-            ) {
-                Text("🏆 LEADERBOARD XP PELAJAR NASIONAL", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                Spacer(modifier = Modifier.height(8.dp))
-                daftarAkun.sortedByDescending { it.xp }.take(5).forEachIndexed { idx, acc ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("#${idx + 1} ${acc.nama} (${acc.role})", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("🔥 ${acc.xp} XP", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        }
-
-        // 2. Form Pengajuan Beasiswa Pendidikan Siswa
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFF10B981), RoundedCornerShape(22.dp))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("🎓 AJUKAN BEASISWA WAKAF PENDIDIKAN", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Black)
-                Text("Program bantuan pendidikan untuk pelajar berprestasi & kurang mampu.", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                OutlinedTextField(
-                    value = alasanBeasiswa,
-                    onValueChange = { alasanBeasiswa = it },
-                    label = { Text("Alasan Pengajuan & Prestasi Anda") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = linkBerkasBeasiswa,
-                    onValueChange = { linkBerkasBeasiswa = it },
-                    label = { Text("Link Google Drive Rapor / Sertifikat") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(
-                    onClick = {
-                        if (alasanBeasiswa.isBlank()) return@Button
-                        scope.launch {
-                            val payload = JSONObject().apply {
-                                put("action", "ajukan_beasiswa")
-                                put("pemohonId", siswa.id)
-                                put("namaPemohon", siswa.nama)
-                                put("emailPemohon", siswa.email)
-                                put("instansi", siswa.instansi)
-                                put("alasan", alasanBeasiswa)
-                                put("linkBerkas", linkBerkasBeasiswa)
-                            }
-                            IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
-                                Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-                                alasanBeasiswa = ""
-                                linkBerkasBeasiswa = ""
-                                onRefresh()
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Kirim Pengajuan Beasiswa ke Admin", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
-                }
-            }
-        }
-
-        // 3. Form Kirim Laporan Bug / Usulan Fitur
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFF0F172A))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("🐞 LAPORKAN BUG / USULAN MATERI KE ADMIN", color = Color(0xFFF87171), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                OutlinedTextField(value = judulLaporanBug, onValueChange = { judulLaporanBug = it }, label = { Text("Judul Laporan / Usulan") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = isiLaporanBug, onValueChange = { isiLaporanBug = it }, label = { Text("Detail Masukan") }, modifier = Modifier.fillMaxWidth())
-                Button(
-                    onClick = {
-                        if (judulLaporanBug.isBlank()) return@Button
-                        scope.launch {
-                            val payload = JSONObject().apply {
-                                put("action", "kirim_laporan")
-                                put("pelaporNama", siswa.nama)
-                                put("pelaporRole", siswa.role)
-                                put("judul", judulLaporanBug)
-                                put("deskripsi", isiLaporanBug)
-                            }
-                            IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
-                                Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                                judulLaporanBug = ""
-                                isiLaporanBug = ""
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F46E5)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Kirim Laporan ke Server", color = Color.White, fontWeight = FontWeight.Black)
-                }
-            }
-        }
-    }
-}
-
-// ============================================================================
-// MENU 1 NATIVE: RUANG BELAJAR, JENJANG, BAB MATERI & KUIS INTERAKTIF
+// KOMPONEN MENU RUANG BELAJAR, STUDIO GURU, ADMIN, BEASISWA & REMOTE BLYNK
+// (DENGAN TEMA CERAH DEFAULT YANG SEGAR & KONTRAS TINGGI)
 // ============================================================================
 @Composable
 fun MenuRuangBelajarNative(
@@ -1357,15 +1114,18 @@ fun MenuRuangBelajarNative(
     pesanError: String?,
     daftarJenjang: List<JenjangNativeItem>,
     onRefresh: () -> Unit,
-    onTambahXp: (Int) -> Unit
+    onTambahXp: (Int) -> Unit,
+    onBukaTalentMapping: () -> Unit = {},
+    onBukaForumLive: () -> Unit = {}
 ) {
+    val tema = LocalHibahTheme.current
     var jenjangDipilih by remember { mutableStateOf<JenjangNativeItem?>(null) }
     var modulDipilih by remember { mutableStateOf<KelasModulNative?>(null) }
-    var jawabanKuisMap by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var jawabanKuisMap by remember { mutableStateOf(mapOf<String, Int>()) }
 
     if (sedangMemuat) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Color(0xFF10B981))
+            CircularProgressIndicator(color = tema.aksenPrimer)
         }
         return
     }
@@ -1373,9 +1133,16 @@ fun MenuRuangBelajarNative(
     if (pesanError != null) {
         Box(modifier = Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(pesanError, color = Color(0xFFF87171), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(pesanError, color = Color(0xFFDC2626), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = onRefresh) { Text("Muat Ulang dari Server") }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onBukaTalentMapping,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48))
+                ) {
+                    Text("🔥 Buka Tes Talent Mapping Sekarang", color = Color.White, fontWeight = FontWeight.Black)
+                }
             }
         }
         return
@@ -1390,83 +1157,85 @@ fun MenuRuangBelajarNative(
             item {
                 Button(
                     onClick = { modulDipilih = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B))
+                    colors = ButtonDefaults.buttonColors(containerColor = tema.aksenPrimer)
                 ) {
-                    Text("← Kembali ke Daftar Modul", color = Color.White, fontSize = 12.sp)
+                    Text("← Kembali ke Daftar Modul", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF10B981), RoundedCornerShape(22.dp))
-                        .padding(18.dp)
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = tema.bgKartu,
+                    shadowElevation = 3.dp,
+                    modifier = Modifier.fillMaxWidth().border(1.5.dp, tema.borderKartu, RoundedCornerShape(22.dp))
                 ) {
-                    Text("${mdl.level} • ${mdl.durasi} • KKM ${mdl.syaratSkorMinimal}", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                    Text(mdl.judul, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black)
-                    Text("Pengajar: ${mdl.pembuatNama}", color = Color(0xFF94A3B8), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(mdl.rangkumanTeks, color = Color(0xFFCBD5E1), fontSize = 13.sp)
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text("${mdl.level} • ${mdl.durasi} • KKM ${mdl.syaratSkorMinimal}", color = tema.aksenPrimer, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        Text(mdl.judul, color = tema.teksUtama, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                        Text("Pengajar: ${mdl.pembuatNama}", color = tema.teksSekunder, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(mdl.rangkumanTeks, color = tema.teksUtama, fontSize = 13.sp)
+                    }
                 }
             }
 
             items(mdl.daftarBab) { bab ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(18.dp))
-                        .padding(16.dp)
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = tema.bgKartu,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth().border(1.dp, tema.borderKartu, RoundedCornerShape(18.dp))
                 ) {
-                    Text("${bab.judulBab} (${bab.durasiBab})", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(bab.isiTeks, color = Color(0xFFCBD5E1), fontSize = 12.sp)
-                    if (bab.rumus.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Surface(color = Color(0xFF020617), shape = RoundedCornerShape(10.dp)) {
-                            Text("📐 Rumus: ${bab.rumus}", color = Color(0xFF38BDF8), fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.padding(10.dp))
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("${bab.judulBab} (${bab.durasiBab})", color = tema.teksUtama, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(bab.isiTeks, color = tema.teksSekunder, fontSize = 12.5.sp)
+                        if (bab.rumus.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(color = Color(0xFFF0FDF4), shape = RoundedCornerShape(10.dp)) {
+                                Text("📐 Rumus: ${bab.rumus}", color = Color(0xFF065F46), fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
+                            }
                         }
                     }
                 }
             }
 
             items(mdl.daftarKuis) { kuis ->
-                val dipilih = jawabanKuisMap[kuis.id]
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(18.dp))
-                        .padding(16.dp)
+                val dipilih: Int? = jawabanKuisMap[kuis.id]
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = tema.bgKartu,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth().border(1.dp, tema.borderKartu, RoundedCornerShape(18.dp))
                 ) {
-                    Text(kuis.tanya, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    kuis.opsi.forEachIndexed { idx, teksOpsi ->
-                        val isSelected = dipilih == idx
-                        val isCorrect = idx == kuis.jawabanBenar
-                        val bgWarna = if (!isSelected) Color(0xFF1E293B) else if (isCorrect) Color(0xFF065F46) else Color(0xFF7F1D1D)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(bgWarna)
-                                .clickable {
-                                    jawabanKuisMap = jawabanKuisMap + (kuis.id to idx)
-                                    if (isCorrect) onTambahXp(25)
-                                }
-                                .padding(12.dp)
-                        ) {
-                            Text("${('A' + idx)}. $teksOpsi", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(kuis.tanya, color = tema.teksUtama, fontWeight = FontWeight.Black, fontSize = 13.5.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        kuis.opsi.forEachIndexed { idx, teksOpsi ->
+                            val isSelected = dipilih != null && dipilih == idx
+                            val isCorrect = idx == kuis.jawabanBenar
+                            val bgWarna = if (!isSelected) Color(0xFFF1F5F9) else if (isCorrect) Color(0xFFDCFCE7) else Color(0xFFFEE2E2)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(bgWarna)
+                                    .clickable {
+                                        val baru = jawabanKuisMap.toMutableMap()
+                                        baru[kuis.id] = idx
+                                        jawabanKuisMap = baru
+                                        if (isCorrect) onTambahXp(25)
+                                    }
+                                    .padding(12.dp)
+                            ) {
+                                Text("${('A' + idx)}. $teksOpsi", color = Color(0xFF0F172A), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
-                    }
-                    if (dipilih != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("💡 Pembahasan: ${kuis.pembahasan}", color = Color(0xFFFBBF24), fontSize = 11.sp)
+                        if (dipilih != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("💡 Pembahasan: ${kuis.pembahasan}", color = Color(0xFFB45309), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -1483,26 +1252,28 @@ fun MenuRuangBelajarNative(
             item {
                 Button(
                     onClick = { jenjangDipilih = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B))
+                    colors = ButtonDefaults.buttonColors(containerColor = tema.aksenPrimer)
                 ) {
-                    Text("← Kembali ke Semua Jenjang", color = Color.White, fontSize = 12.sp)
+                    Text("← Kembali ke Semua Jenjang", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
             items(jnj.kelas) { kls ->
-                Column(
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = tema.bgKartu,
+                    shadowElevation = 3.dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF0F172A))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp))
+                        .border(1.5.dp, tema.borderKartu, RoundedCornerShape(20.dp))
                         .clickable { modulDipilih = kls }
-                        .padding(16.dp)
                 ) {
-                    Text("${kls.level} • ${kls.durasi}", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    Text(kls.judul, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    Text("Oleh: ${kls.pembuatNama}", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("${kls.daftarBab.size} Bab • ${kls.daftarKuis.size} Kuis → Buka Modul", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("${kls.level} • ${kls.durasi}", color = tema.aksenPrimer, fontSize = 10.5.sp, fontWeight = FontWeight.Black)
+                        Text(kls.judul, color = tema.teksUtama, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                        Text("Oleh: ${kls.pembuatNama}", color = tema.teksSekunder, fontSize = 11.5.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("${kls.daftarBab.size} Bab • ${kls.daftarKuis.size} Kuis → Buka Modul", color = Color(0xFFD97706), fontSize = 11.5.sp, fontWeight = FontWeight.Black)
+                    }
                 }
             }
         }
@@ -1510,155 +1281,324 @@ fun MenuRuangBelajarNative(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxSize().padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(daftarJenjang) { item ->
+        item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp))
-                    .clickable { jenjangDipilih = item }
-                    .padding(18.dp)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFFE11D48),
+                                Color(0xFFF43F5E),
+                                Color(0xFFD97706)
+                            )
+                        )
+                    )
+                    .border(2.dp, Color(0xFFFACC15), RoundedCornerShape(26.dp))
+                    .clickable { onBukaTalentMapping() }
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(item.nama, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Black)
-                    Text("${item.kelas.size} Modul", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    Surface(
+                        color = Color(0xFFFACC15),
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Text(
+                            text = "🔥 FITUR UTAMA & PENTING",
+                            color = Color(0xFF0F172A),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
+                    Text(
+                        text = "🔒 Confidential PDF",
+                        color = Color(0xFFFDE68A),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-                Text(item.tagline, color = Color(0xFF38BDF8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text(item.deskripsi, color = Color(0xFF94A3B8), fontSize = 12.sp)
+
+                Text(
+                    text = "Tes Talent Mapping® & Peta Kekuatan Diri (4 Kategori Usia)",
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    text = "Kenali bakat alami, buku mewarnai anak (Touchscreen/Stylus), VAK SMP, jurusan kuliah SMA, hingga 34 Bakat & Sertifikat Landscape!",
+                    color = Color.White.copy(alpha = 0.92f),
+                    fontSize = 11.5.sp
+                )
+
+                Button(
+                    onClick = onBukaTalentMapping,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFACC15)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                ) {
+                    Text(
+                        text = "🚀 Mulai Tes Talent Mapping Sekarang",
+                        color = Color(0xFF0F172A),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.5.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "📚 KURIKULUM & MODUL KELAS INTERAKTIF:",
+                    color = tema.aksenPrimer,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Black
+                )
+                TextButton(onClick = onBukaForumLive) {
+                    Text("💬 Tanya PR & Live →", color = Color(0xFF0284C7), fontSize = 11.5.sp, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+
+        items(daftarJenjang) { item ->
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = tema.bgKartu,
+                shadowElevation = 3.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.5.dp, tema.borderKartu, RoundedCornerShape(22.dp))
+                    .clickable { jenjangDipilih = item }
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(item.nama, color = tema.teksUtama, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                        Surface(
+                            color = tema.aksenPrimer.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                "${item.kelas.size} Modul",
+                                color = tema.aksenPrimer,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                    Text(item.tagline, color = Color(0xFF0284C7), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(item.deskripsi, color = tema.teksSekunder, fontSize = 12.sp)
+                }
             }
         }
     }
 }
 
-// ============================================================================
-// MENU CBT NATIVE (DENGAN TIMER HITUNG MUNDUR)
-// ============================================================================
 @Composable
-fun MenuTryoutCbtNative(
-    daftarTryout: List<PaketTryoutNative>,
-    onTambahXp: (Int) -> Unit
+fun MenuStudioPengajarGuruNative(
+    guru: UserAccount,
+    daftarJenjang: List<JenjangNativeItem>,
+    daftarAkun: List<UserAccount>,
+    onSuksesSimpanKeServer: () -> Unit
 ) {
-    var paketAktif by remember { mutableStateOf<PaketTryoutNative?>(null) }
-    var jawabanUser by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
-    var sudahSubmit by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var judulModul by remember { mutableStateOf("") }
+    var rangkumanModul by remember { mutableStateOf("") }
+    var isiBab by remember { mutableStateOf("") }
 
-    if (paketAktif != null) {
-        val pkt = paketAktif!!
-        val benarCount = pkt.daftarSoal.indices.count { idx ->
-            jawabanUser[idx] == pkt.daftarSoal[idx].jawabanBenar
-        }
-        val skorAkhir = if (pkt.daftarSoal.isNotEmpty()) (benarCount * 100) / pkt.daftarSoal.size else 0
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item {
-                Button(
-                    onClick = {
-                        paketAktif = null
-                        jawabanUser = emptyMap()
-                        sudahSubmit = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B))
-                ) {
-                    Text("← Keluar dari Ujian CBT", color = Color.White)
-                }
-            }
-            item {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White,
+                shadowElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth().border(1.5.dp, Color(0xFFCBD5E1), RoundedCornerShape(22.dp))
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color(0xFF0F172A)).padding(16.dp)
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("${pkt.kategoriTes} • ${pkt.durasiMenit} Menit", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                    Text(pkt.judul, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                    if (sudahSubmit) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("🏆 Skor Akhir Anda: $skorAkhir / 100", color = Color(0xFF34D399), fontSize = 18.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-
-            items(pkt.daftarSoal.size) { sIdx ->
-                val soal = pkt.daftarSoal[sIdx]
-                val dipilih = jawabanUser[sIdx]
-                Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(18.dp)).padding(16.dp)
-                ) {
-                    Text("Soal #${sIdx + 1}: ${soal.tanya}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    soal.opsi.forEachIndexed { oIdx, teks ->
-                        val dipilihIni = dipilih == oIdx
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (dipilihIni) Color(0xFF4F46E5) else Color(0xFF1E293B))
-                                .clickable(enabled = !sudahSubmit) {
-                                    jawabanUser = jawabanUser + (sIdx to oIdx)
-                                }
-                                .padding(12.dp)
-                        ) {
-                            Text("${('A' + oIdx)}. $teks", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    if (sudahSubmit) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("✓ Pembahasan: ${soal.pembahasan}", color = Color(0xFF34D399), fontSize = 11.sp)
-                    }
-                }
-            }
-
-            if (!sudahSubmit) {
-                item {
+                    Text("👨‍🏫 STUDIO GURU & DOSEN", color = Color(0xFF4F46E5), fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    OutlinedTextField(value = judulModul, onValueChange = { judulModul = it }, label = { Text("Judul Modul Kelas Baru") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = rangkumanModul, onValueChange = { rangkumanModul = it }, label = { Text("Rangkuman Modul") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = isiBab, onValueChange = { isiBab = it }, label = { Text("Uraian Materi Bab 1") }, modifier = Modifier.fillMaxWidth())
                     Button(
                         onClick = {
-                            sudahSubmit = true
-                            onTambahXp(50)
+                            if (judulModul.isBlank()) return@Button
+                            scope.launch {
+                                val payload = JSONObject().apply {
+                                    put("action", "guru_tambah_modul")
+                                    put("idJenjang", "sma")
+                                    put("judul", judulModul)
+                                    put("pembuatId", guru.id)
+                                    put("pembuatNama", guru.nama)
+                                    put("rangkuman", rangkumanModul)
+                                    put("judulBab", "Bab 1")
+                                    put("isiBab", isiBab)
+                                }
+                                IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
+                                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                                    judulModul = ""
+                                    onSuksesSimpanKeServer()
+                                }
+                            }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Kumpulkan Ujian CBT (+50 XP)", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
+                        Text("Terbitkan Modul ke Server", color = Color.White, fontWeight = FontWeight.Black)
                     }
                 }
             }
         }
-        return
     }
+}
 
+@Composable
+fun MenuPanelAdminServerNative(
+    daftarAkun: List<UserAccount>,
+    daftarBeasiswa: List<PengajuanBeasiswaNative>,
+    onRefresh: () -> Unit
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(daftarTryout) { pkt ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp))
-                    .clickable { paketAktif = pkt }
-                    .padding(18.dp)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("${pkt.kategoriTes} • ${pkt.jenjang} • ${pkt.durasiMenit} Menit", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Black)
-                Text(pkt.judul, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                Text("${pkt.daftarSoal.size} Butir Soal → Mulai Kerjakan CBT", color = Color(0xFF38BDF8), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Data Akun Server (${daftarAkun.size})", color = Color(0xFF0F172A), fontSize = 18.sp, fontWeight = FontWeight.Black)
+                Button(onClick = onRefresh) { Text("🔄 Refresh") }
+            }
+        }
+        items(daftarAkun) { acc ->
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(16.dp))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(acc.nama, color = Color(0xFF0F172A), fontWeight = FontWeight.Black, fontSize = 15.sp)
+                    Text("${acc.email} • ${acc.role.uppercase()}", color = Color(0xFF0284C7), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(acc.instansi, color = Color(0xFF475569), fontSize = 11.sp)
+                }
             }
         }
     }
 }
 
-// ============================================================================
-// MENU FORUM DISKUSI PR (GURU BISA JAWAB & TANDAI SOLVED) & LIVE WEBINAR
-// ============================================================================
+@Composable
+fun MenuBeasiswaLeaderboardDanLaporanSiswa(
+    siswa: UserAccount,
+    daftarBeasiswa: List<PengajuanBeasiswaNative>,
+    daftarAkun: List<UserAccount>,
+    tokenAktif: String,
+    onRefresh: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var alasanBeasiswa by remember { mutableStateOf("") }
+    var linkBerkasBeasiswa by remember { mutableStateOf("") }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White,
+                shadowElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth().border(1.5.dp, Color(0xFFF59E0B), RoundedCornerShape(22.dp))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("🏆 LEADERBOARD XP PELAJAR NASIONAL", color = Color(0xFFD97706), fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    daftarAkun.sortedByDescending { it.xp }.take(5).forEachIndexed { idx, acc ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("#${idx + 1} ${acc.nama}", color = Color(0xFF0F172A), fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                            Text("🔥 ${acc.xp} XP", color = Color(0xFF059669), fontSize = 12.5.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White,
+                shadowElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth().border(1.5.dp, Color(0xFF10B981), RoundedCornerShape(22.dp))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("🎓 AJUKAN BEASISWA WAKAF PENDIDIKAN", color = Color(0xFF059669), fontSize = 12.5.sp, fontWeight = FontWeight.Black)
+                    OutlinedTextField(value = alasanBeasiswa, onValueChange = { alasanBeasiswa = it }, label = { Text("Alasan Pengajuan & Prestasi") }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = linkBerkasBeasiswa, onValueChange = { linkBerkasBeasiswa = it }, label = { Text("Link Google Drive Rapor / Sertifikat") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Button(
+                        onClick = {
+                            if (alasanBeasiswa.isBlank()) return@Button
+                            scope.launch {
+                                val payload = JSONObject().apply {
+                                    put("action", "ajukan_beasiswa")
+                                    put("pemohonId", siswa.id)
+                                    put("namaPemohon", siswa.nama)
+                                    put("emailPemohon", siswa.email)
+                                    put("instansi", siswa.instansi)
+                                    put("alasan", alasanBeasiswa)
+                                    put("linkBerkas", linkBerkasBeasiswa)
+                                }
+                                IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
+                                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                                    alasanBeasiswa = ""
+                                    onRefresh()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Kirim Pengajuan Beasiswa", color = Color.White, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun MenuForumDanWebinarNative(
     user: UserAccount,
@@ -1670,119 +1610,119 @@ fun MenuForumDanWebinarNative(
     val scope = rememberCoroutineScope()
     var judulTanya by remember { mutableStateOf("") }
     var isiTanya by remember { mutableStateOf("") }
-    var inputBalasanMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var inputBalasanMap by remember { mutableStateOf(mapOf<String, String>()) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("🔴 AGENDA WEBINAR NASIONAL (SERVER):", color = Color(0xFFF87171), fontSize = 11.sp, fontWeight = FontWeight.Black)
+            Text("🔴 AGENDA WEBINAR NASIONAL:", color = Color(0xFFE11D48), fontSize = 12.sp, fontWeight = FontWeight.Black)
         }
         items(daftarWebinar) { wb ->
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(18.dp)).padding(14.dp)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(18.dp))
             ) {
-                Text("${wb.kategoriAcara} • ${wb.platform}", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                Text(wb.judulAcara, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Black)
-                Text("Narasumber: ${wb.narasumber} | ${wb.tanggalWaktu}", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("${wb.kategoriAcara} • ${wb.platform}", color = Color(0xFF059669), fontSize = 10.5.sp, fontWeight = FontWeight.Black)
+                    Text(wb.judulAcara, color = Color(0xFF0F172A), fontSize = 15.sp, fontWeight = FontWeight.Black)
+                    Text("Narasumber: ${wb.narasumber} | ${wb.tanggalWaktu}", color = Color(0xFF475569), fontSize = 11.5.sp)
+                }
             }
         }
 
         item {
-            Text("💬 TANYA PR / DISKUSI BARU:", color = Color(0xFFFBBF24), fontSize = 11.sp, fontWeight = FontWeight.Black)
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF0F172A)).padding(14.dp)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(18.dp))
             ) {
-                OutlinedTextField(value = judulTanya, onValueChange = { judulTanya = it }, label = { Text("Judul Pertanyaan PR / Koding") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = isiTanya, onValueChange = { isiTanya = it }, label = { Text("Detail soal...") }, modifier = Modifier.fillMaxWidth())
-                Spacer(modifier = Modifier.height(10.dp))
-                Button(
-                    onClick = {
-                        if (judulTanya.isBlank() || isiTanya.isBlank()) return@Button
-                        scope.launch {
-                            val payload = JSONObject().apply {
-                                put("action", "tambah_diskusi")
-                                put("penanya", user.nama)
-                                put("mapel", "Sains & IoT")
-                                put("judul", judulTanya)
-                                put("pertanyaan", isiTanya)
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("💬 TANYA PR / DISKUSI BARU:", color = Color(0xFFD97706), fontSize = 11.5.sp, fontWeight = FontWeight.Black)
+                    OutlinedTextField(value = judulTanya, onValueChange = { judulTanya = it }, label = { Text("Judul Pertanyaan PR / Koding") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = isiTanya, onValueChange = { isiTanya = it }, label = { Text("Detail soal...") }, modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            if (judulTanya.isBlank() || isiTanya.isBlank()) return@Button
+                            scope.launch {
+                                val payload = JSONObject().apply {
+                                    put("action", "tambah_diskusi")
+                                    put("penanya", user.nama)
+                                    put("mapel", "Sains & IoT")
+                                    put("judul", judulTanya)
+                                    put("pertanyaan", isiTanya)
+                                }
+                                IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
+                                    judulTanya = ""
+                                    isiTanya = ""
+                                    onRefreshServer()
+                                }
                             }
-                            IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
-                                judulTanya = ""
-                                isiTanya = ""
-                                onRefreshServer()
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Kirim Pertanyaan ke Server", color = Color(0xFF022C22), fontWeight = FontWeight.Black)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Kirim Pertanyaan ke Server", color = Color.White, fontWeight = FontWeight.Black)
+                    }
                 }
             }
         }
 
         items(daftarForum) { d ->
-            val teksBalas = inputBalasanMap[d.id] ?: ""
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFF0F172A)).border(1.dp, if (d.solved) Color(0xFF10B981) else Color(0xFF334155), RoundedCornerShape(18.dp)).padding(14.dp)
+            val teksBalas: String = inputBalasanMap[d.id] ?: ""
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth().border(1.5.dp, if (d.solved) Color(0xFF10B981) else Color(0xFFCBD5E1), RoundedCornerShape(18.dp))
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${d.mapel} • Oleh ${d.penanya}", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    if (d.solved) {
-                        Text("✓ TERJAWAB GURU", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    }
-                }
-                Text(d.judul, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                Text(d.pertanyaan, color = Color(0xFFCBD5E1), fontSize = 12.sp)
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("${d.mapel} • Oleh ${d.penanya}", color = Color(0xFF0284C7), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Text(d.judul, color = Color(0xFF0F172A), fontSize = 14.5.sp, fontWeight = FontWeight.Black)
+                    Text(d.pertanyaan, color = Color(0xFF334155), fontSize = 12.sp)
 
-                if (d.jawaban.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    d.jawaban.forEach { jwb ->
-                        Surface(
-                            color = Color(0xFF020617),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = teksBalas,
+                            onValueChange = { nilaiBaru ->
+                                val salinan = inputBalasanMap.toMutableMap()
+                                salinan[d.id] = nilaiBaru
+                                inputBalasanMap = salinan
+                            },
+                            label = { Text("Tulis jawaban...") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(
+                            onClick = {
+                                if (teksBalas.isBlank()) return@Button
+                                scope.launch {
+                                    val payload = JSONObject().apply {
+                                        put("action", "balas_diskusi")
+                                        put("diskusiId", d.id)
+                                        put("penjawab", user.nama)
+                                        put("role", user.role)
+                                        put("isiJawaban", teksBalas)
+                                    }
+                                    IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
+                                        val salinan = inputBalasanMap.toMutableMap()
+                                        salinan.remove(d.id)
+                                        inputBalasanMap = salinan
+                                        Toast.makeText(context, "Balasan terkirim!", Toast.LENGTH_SHORT).show()
+                                        onRefreshServer()
+                                    }
+                                }
+                            }
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text("${jwb.penjawab} (${jwb.role})", color = Color(0xFFFBBF24), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                                Text(jwb.isi, color = Color.White, fontSize = 11.sp)
-                            }
+                            Text("Kirim")
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = teksBalas,
-                        onValueChange = { inputBalasanMap = inputBalasanMap + (d.id to it) },
-                        label = { Text(if (user.role == "guru") "Jawab PR ini sebagai Guru..." else "Tulis balasan...") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Button(
-                        onClick = {
-                            if (teksBalas.isBlank()) return@Button
-                            scope.launch {
-                                val payload = JSONObject().apply {
-                                    put("action", "balas_diskusi")
-                                    put("diskusiId", d.id)
-                                    put("penjawab", user.nama)
-                                    put("role", user.role)
-                                    put("isiJawaban", teksBalas)
-                                }
-                                IotCloudApiService.kirimAksiKontenKeServer(payload).onSuccess {
-                                    inputBalasanMap = inputBalasanMap - d.id
-                                    Toast.makeText(context, "Balasan terkirim!", Toast.LENGTH_SHORT).show()
-                                    onRefreshServer()
-                                }
-                            }
-                        }
-                    ) {
-                        Text("Kirim")
                     }
                 }
             }
@@ -1790,9 +1730,6 @@ fun MenuForumDanWebinarNative(
     }
 }
 
-// ============================================================================
-// MENU REMOTE DASHBOARD BLYNK IOT NATIVE
-// ============================================================================
 @Composable
 fun LayarRemoteBlynkIotNative(
     user: UserAccount,
@@ -1812,7 +1749,6 @@ fun LayarRemoteBlynkIotNative(
     var jarakV1 by remember { mutableStateOf(40.0) }
     var sakelarSolenoidV2 by remember { mutableStateOf(true) }
     var sakelarPompaV3 by remember { mutableStateOf(true) }
-    var sudutServoV4 by remember { mutableStateOf(90f) }
 
     LaunchedEffect(tokenAktif, brokerRunning) {
         while (brokerRunning) {
@@ -1823,7 +1759,6 @@ fun LayarRemoteBlynkIotNative(
                 st.virtualPins["V1"]?.let { jarakV1 = it }
                 st.statusAktuator["V1"]?.let { sakelarSolenoidV2 = it }
                 st.statusAktuator["V2"]?.let { sakelarPompaV3 = it }
-                st.virtualPins["V3"]?.let { sudutServoV4 = it.toFloat() }
             }.onFailure {
                 statusKoneksi = "Menunggu respon /api/iot/cloud..."
             }
@@ -1832,146 +1767,114 @@ fun LayarRemoteBlynkIotNative(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFF0F172A))
-                    .border(1.5.dp, Color(0xFF10B981).copy(alpha = 0.4f), RoundedCornerShape(22.dp))
-                    .padding(16.dp)
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White,
+                shadowElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth().border(1.5.dp, Color(0xFF10B981), RoundedCornerShape(22.dp))
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("SERVER BROKER HIBAHILMU.MY.ID", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                        Text(statusKoneksi, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Button(
-                        onClick = { brokerRunning = !brokerRunning },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (brokerRunning) Color(0xFF10B981) else Color(0xFFEF4444)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (brokerRunning) "● RUNNING" else "⏹ STOPPED",
-                            color = if (brokerRunning) Color(0xFF022C22) else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("SERVER BROKER HIBAHILMU.MY.ID", color = Color(0xFF059669), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            Text(statusKoneksi, color = Color(0xFF0F172A), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { brokerRunning = !brokerRunning },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (brokerRunning) Color(0xFF10B981) else Color(0xFFEF4444)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (brokerRunning) "● RUNNING" else "⏹ STOPPED",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = tokenAktif,
+                        onValueChange = { onUbahToken(it) },
+                        label = { Text("BLYNK AUTH TOKEN PROJECT") },
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                clipboard.setText(AnnotatedString(tokenAktif))
+                                Toast.makeText(context, "Token berhasil disalin!", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = "Salin", tint = Color(0xFF059669))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(20.dp))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("VIRTUAL PIN V0", color = Color(0xFFD97706), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        Text("${suhuV0.roundToInt()} °C", color = Color(0xFF0F172A), fontSize = 24.sp, fontWeight = FontWeight.Black)
+                        Text("Suhu DHT22", color = Color(0xFF475569), fontSize = 11.sp)
+                        Slider(
+                            value = suhuV0.toFloat(),
+                            onValueChange = { suhuV0 = it.toDouble() },
+                            onValueChangeFinished = {
+                                scope.launch {
+                                    IotCloudApiService.kirimPerubahanPinKeServer(tokenAktif, user.nama, projectPilih.second, "V0", suhuV0.roundToInt())
+                                }
+                            },
+                            valueRange = -10f..60f
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = tokenAktif,
-                    onValueChange = { onUbahToken(it) },
-                    label = { Text("BLYNK AUTH TOKEN PROJECT") },
-                    singleLine = true,
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            clipboard.setText(AnnotatedString(tokenAktif))
-                            Toast.makeText(context, "Token berhasil disalin!", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = "Salin", tint = Color(0xFF34D399))
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp)).padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.weight(1f).border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(20.dp))
                 ) {
-                    Text("VIRTUAL PIN V0", color = Color(0xFFFBBF24), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    Text("${suhuV0.roundToInt()} °C", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
-                    Text("Suhu DHT22", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    Slider(
-                        value = suhuV0.toFloat(),
-                        onValueChange = { suhuV0 = it.toDouble() },
-                        onValueChangeFinished = {
-                            scope.launch {
-                                IotCloudApiService.kirimPerubahanPinKeServer(tokenAktif, user.nama, projectPilih.second, "V0", suhuV0.roundToInt())
-                            }
-                        },
-                        valueRange = -10f..60f
-                    )
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp)).padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("VIRTUAL PIN V1", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    Text("${jarakV1.roundToInt()} cm", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
-                    Text("Sonar HC-SR04", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                    Slider(
-                        value = jarakV1.toFloat(),
-                        onValueChange = { jarakV1 = it.toDouble() },
-                        onValueChangeFinished = {
-                            scope.launch {
-                                IotCloudApiService.kirimPerubahanPinKeServer(tokenAktif, user.nama, projectPilih.second, "V1", jarakV1.roundToInt())
-                            }
-                        },
-                        valueRange = 2f..400f
-                    )
-                }
-            }
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp)).padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("PIN V1 • RELAY CH1", color = Color(0xFF34D399), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    Text("Solenoid Lock 12V", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            sakelarSolenoidV2 = !sakelarSolenoidV2
-                            scope.launch {
-                                IotCloudApiService.kirimPerubahanPinKeServer(tokenAktif, user.nama, projectPilih.second, "V1", if (sakelarSolenoidV2) 1 else 0)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (sakelarSolenoidV2) Color(0xFF10B981) else Color(0xFF1E293B)),
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(if (sakelarSolenoidV2) "🔓 UNLOCK" else "🔒 LOCKED", color = if (sakelarSolenoidV2) Color(0xFF022C22) else Color.White, fontWeight = FontWeight.Black)
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color(0xFF0F172A)).border(1.dp, Color(0xFF334155), RoundedCornerShape(20.dp)).padding(14.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("PIN V2 • RELAY CH2", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                    Text("Pompa Air Mini", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            sakelarPompaV3 = !sakelarPompaV3
-                            scope.launch {
-                                IotCloudApiService.kirimPerubahanPinKeServer(tokenAktif, user.nama, projectPilih.second, "V2", if (sakelarPompaV3) 1 else 0)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (sakelarPompaV3) Color(0xFF0284C7) else Color(0xFF1E293B)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(if (sakelarPompaV3) "💦 POMPA ON" else "⏹ POMPA OFF", color = Color.White, fontWeight = FontWeight.Black)
+                        Text("VIRTUAL PIN V1", color = Color(0xFF0284C7), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        Text("${jarakV1.roundToInt()} cm", color = Color(0xFF0F172A), fontSize = 24.sp, fontWeight = FontWeight.Black)
+                        Text("Sonar HC-SR04", color = Color(0xFF475569), fontSize = 11.sp)
+                        Slider(
+                            value = jarakV1.toFloat(),
+                            onValueChange = { jarakV1 = it.toDouble() },
+                            onValueChangeFinished = {
+                                scope.launch {
+                                    IotCloudApiService.kirimPerubahanPinKeServer(tokenAktif, user.nama, projectPilih.second, "V1", jarakV1.roundToInt())
+                                }
+                            },
+                            valueRange = 2f..400f
+                        )
                     }
                 }
             }
